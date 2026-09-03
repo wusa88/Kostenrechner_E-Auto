@@ -34,6 +34,29 @@
     return isNaN(t) ? iso : t.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
+  /* Was getippt wurde -> JJJJ-MM-TT, oder null. Nimmt 3.9.26 genauso wie 03.09.2026. */
+  const datumGelesen = (text) => {
+    const t = String(text ?? "").trim();
+    if (!t) return null;
+
+    const bauen = (jahr, monat, tag) => {
+      const d = new Date(jahr, monat - 1, tag);
+      if (d.getFullYear() !== jahr || d.getMonth() !== monat - 1 || d.getDate() !== tag) {
+        return null;   // fängt den 31.02. ab
+      }
+      const zwei = (z) => String(z).padStart(2, "0");
+      return `${jahr}-${zwei(monat)}-${zwei(tag)}`;
+    };
+
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return bauen(+m[1], +m[2], +m[3]);
+
+    m = t.match(/^(\d{1,2})[.,\/\s-]+(\d{1,2})[.,\/\s-]+(\d{2}|\d{4})\.?$/);
+    if (m) return bauen(+m[3] < 100 ? 2000 + +m[3] : +m[3], +m[2], +m[1]);
+
+    return null;
+  };
+
   const sicher = (text) =>
     String(text ?? "").replace(/[&<>"']/g, (z) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[z]));
@@ -90,7 +113,7 @@
     if (!$("e_strompreis").matches(":focus")) $("e_strompreis").value = komma(gelesen(e.strompreis), 1);
     if (!$("e_fahrzeug").matches(":focus")) $("e_fahrzeug").value = e.fahrzeug || "";
 
-    if (!$("f_datum").value) $("f_datum").value = daten.heute;
+    if (!$("f_datum").value) datumSetzen(daten.heute);
 
     uebersicht(a);
     orte(a);
@@ -331,7 +354,7 @@
 
   function formularFuellen(l) {
     $("f_id").value = l ? l.id : "";
-    $("f_datum").value = l ? l.datum : (zustand ? zustand.heute : "");
+    datumSetzen(l ? l.datum : (zustand ? zustand.heute : ""));
     $("f_km").value = l ? komma(l.km, 0) : "";
     $("f_kwh").value = l ? komma(l.kwh, 2) : "";
     $("f_notiz").value = l ? l.notiz : "";
@@ -352,9 +375,17 @@
     preisHinweis();
   }
 
+  /* Setzt beide Felder: sichtbar deutsch, im Kalender ISO. */
+  function datumSetzen(iso) {
+    $("f_datum").value = iso ? datumDe(iso) : "";
+    $("f_kalender").value = iso || "";
+  }
+
   function eingabe() {
+    const iso = datumGelesen($("f_datum").value);
+    if (!iso) throw new Error("Datum: bitte als TT.MM.JJJJ eintragen, z. B. 03.09.2026.");
     const daten = {
-      datum: $("f_datum").value,
+      datum: iso,
       km: $("f_km").value,
       kwh: $("f_kwh").value,
       notiz: $("f_notiz").value,
@@ -393,6 +424,23 @@
     });
 
     $("f_abbrechen").addEventListener("click", () => formularFuellen(null));
+
+    // Beim Verlassen sauber ausschreiben: aus 3.9.26 wird 03.09.2026.
+    $("f_datum").addEventListener("blur", () => {
+      const iso = datumGelesen($("f_datum").value);
+      if (iso) datumSetzen(iso);
+    });
+    $("f_kalenderknopf").addEventListener("click", () => {
+      const kalender = $("f_kalender");
+      kalender.value = datumGelesen($("f_datum").value) || (zustand ? zustand.heute : "");
+      if (typeof kalender.showPicker === "function") {
+        try { kalender.showPicker(); return; } catch (fehler) { /* siehe unten */ }
+      }
+      kalender.focus();     // ohne showPicker bleibt der Weg über die Tastatur
+    });
+    $("f_kalender").addEventListener("change", () => {
+      if ($("f_kalender").value) datumSetzen($("f_kalender").value);
+    });
     $("f_kwh").addEventListener("input", preisHinweis);
     $("f_preis").addEventListener("input", () => {
       preisIstVorschlag = false;
