@@ -85,13 +85,22 @@ def zahl(wert, feld: str, *, minimum: float | None = 0.0,
     return gelesen
 
 
+DATUMSFORMATE = ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y")
+
+
 def datum_aus(wert, feld: str = "Datum") -> date:
+    """Nimmt JJJJ-MM-TT und TT.MM.JJJJ — die Oberflaeche schickt ersteres."""
     if not wert:
         return date.today()
-    try:
+    if isinstance(wert, (date, datetime)):
         return datum_lesen(wert)
-    except (ValueError, TypeError):
-        raise Eingabefehler(f"{feld}: „{wert}“ ist kein Datum (erwartet JJJJ-MM-TT).") from None
+    text = str(wert).strip()
+    for format in DATUMSFORMATE:
+        try:
+            return datetime.strptime(text, format).date()
+        except ValueError:
+            continue
+    raise Eingabefehler(f"{feld}: „{wert}“ ist kein Datum (erwartet TT.MM.JJJJ).")
 
 
 def ort_aus(wert) -> str:
