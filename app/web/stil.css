@@ -1,0 +1,249 @@
+/* Kostenberechnung E-Auto — eine Datei, keine Abhängigkeiten. */
+
+:root {
+  color-scheme: light dark;
+  --grund: #f4f6f8;
+  --karte: #ffffff;
+  --rand: #dfe4ea;
+  --text: #1b2430;
+  --leise: #5d6b7a;
+  --akzent: #0f766e;
+  --akzent-weich: #d8efec;
+  --strom: #0f766e;
+  --benzin: #b45309;
+  --gut: #15803d;
+  --warn: #b45309;
+  --schatten: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .07);
+  --rund: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #12161c;
+    --karte: #1a1f27;
+    --rand: #2c333d;
+    --text: #e8edf3;
+    --leise: #9aa7b5;
+    --akzent: #2dd4bf;
+    --akzent-weich: #14343a;
+    --strom: #2dd4bf;
+    --benzin: #f59e0b;
+    --gut: #4ade80;
+    --warn: #fbbf24;
+    --schatten: none;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.innen { width: min(1000px, 100% - 2rem); margin-inline: auto; }
+
+.kopf {
+  background: var(--akzent);
+  color: #fff;
+  padding: 1.6rem 0 1.4rem;
+}
+.kopf h1 { margin: 0; font-size: 1.5rem; letter-spacing: -.01em; }
+.kopf p { margin: .35rem 0 0; opacity: .9; font-size: .95rem; }
+
+main { padding-bottom: 3rem; }
+
+.karte {
+  background: var(--karte);
+  border: 1px solid var(--rand);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  padding: 1.25rem;
+  margin-top: 1.25rem;
+}
+.karte h2 { margin: 0 0 .25rem; font-size: 1.1rem; }
+.karte h3 { margin: 0 0 .6rem; font-size: .95rem; color: var(--leise); font-weight: 600; }
+
+.karten_kopf {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: .5rem;
+}
+.karten_kopf h2 { margin: 0; }
+
+.unterzeile { margin: 0 0 1rem; color: var(--leise); font-size: .9rem; }
+.hinweis { margin: .75rem 0 0; color: var(--leise); font-size: .85rem; }
+
+/* ------------------------------------------------------------- Formulare */
+
+.felder {
+  display: grid; gap: .8rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin-top: 1rem;
+}
+.felder .breit { grid-column: 1 / -1; }
+
+[hidden] { display: none !important; }
+
+label {
+  display: block;
+  font-size: .85rem; font-weight: 600; color: var(--leise);
+}
+label input, .feld input { margin-top: .3rem; }
+
+.feld { font-size: .85rem; font-weight: 600; color: var(--leise); }
+.feldkopf {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; min-height: 28px;
+}
+.einheit { font-weight: 400; opacity: .75; }
+.einheit::before { content: "· "; opacity: .6; }
+
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--grund);
+  border: 1px solid var(--rand);
+  border-radius: 9px;
+  padding: .6rem .7rem;
+  width: 100%;
+  min-height: 44px;
+}
+input:focus { outline: 2px solid var(--akzent); outline-offset: 1px; border-color: transparent; }
+
+.knopfreihe { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+
+button, .knopf {
+  font: inherit; font-weight: 600;
+  border-radius: 9px; border: 1px solid transparent;
+  padding: .6rem 1.1rem; min-height: 44px;
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+button.haupt { background: var(--akzent); color: #fff; }
+button.haupt:hover { filter: brightness(1.07); }
+button.leise, .knopf.leise {
+  background: transparent; color: var(--leise); border-color: var(--rand);
+}
+button.leise:hover, .knopf.leise:hover { border-color: var(--akzent); color: var(--akzent); }
+
+.schalter { display: inline-flex; border: 1px solid var(--rand); border-radius: 9px; overflow: hidden; }
+.schalter.breitschalter { display: flex; margin-top: 1rem; }
+.schalter.breitschalter button { flex: 1; }
+.schalter.klein button { padding: .2rem .55rem; min-height: 28px; font-size: .78rem; }
+.schalter button {
+  border: 0; border-radius: 0; background: transparent; color: var(--leise);
+  padding: .4rem .9rem; min-height: 38px; font-size: .9rem;
+}
+.schalter button.aktiv { background: var(--akzent-weich); color: var(--akzent); }
+
+/* ------------------------------------------------------------ Kennzahlen */
+
+.kennzahlen {
+  display: grid; gap: .8rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.kennzahl {
+  background: var(--grund); border: 1px solid var(--rand);
+  border-radius: 11px; padding: .9rem;
+  display: flex; flex-direction: column; gap: .15rem;
+}
+.kennzahl .wert { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; }
+.kennzahl .name { font-size: .82rem; color: var(--leise); display: flex; flex-direction: column; }
+.kennzahl .name small { opacity: .8; }
+
+/* ------------------------------------------------------------- Vergleich */
+
+.saeulen { display: grid; gap: .9rem; margin: .5rem 0 1rem; }
+.saeule_kopf {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .85rem; font-weight: 600; color: var(--leise); margin-bottom: .3rem;
+}
+.punkt { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
+.punkt.strom { background: var(--strom); }
+.punkt.benzin { background: var(--benzin); }
+.balken { background: var(--grund); border-radius: 8px; height: 30px; overflow: hidden; border: 1px solid var(--rand); }
+.fuellung { height: 100%; width: 0; border-radius: 7px 0 0 7px; transition: width .4s ease; }
+.fuellung.strom { background: var(--strom); }
+.fuellung.benzin { background: var(--benzin); }
+.saeule_wert { margin-top: .3rem; font-weight: 700; font-size: 1.05rem; }
+
+.fazit {
+  margin: 0 0 1rem; padding: .8rem .9rem;
+  background: var(--akzent-weich); color: var(--text);
+  border-radius: 11px; font-size: .95rem;
+}
+.fazit strong { color: var(--akzent); }
+.fazit:empty { display: none; }
+
+/* ----------------------------------------------------------- Monat/Jahr */
+
+.zwei { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+h3.abstand { margin-top: 1.4rem; }
+.ortname { display: flex; align-items: center; gap: .45rem; }
+.ortname .punkt.zuhause { background: var(--akzent); }
+.ortname .punkt.auswaerts { background: var(--benzin); }
+.marke {
+  display: inline-block; padding: .1rem .5rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; border: 1px solid var(--rand); color: var(--leise);
+}
+.marke.zuhause { color: var(--akzent); border-color: var(--akzent); }
+.marke.auswaerts { color: var(--benzin); border-color: var(--benzin); }
+.block { background: var(--grund); border: 1px solid var(--rand); border-radius: 11px; padding: .9rem; }
+.block dl { margin: 0; }
+.block dl > div {
+  display: flex; justify-content: space-between; gap: 1rem;
+  padding: .45rem 0; border-bottom: 1px solid var(--rand); font-size: .92rem;
+}
+.block dl > div:last-child { border-bottom: 0; }
+.block dt { color: var(--leise); }
+.block dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.block .hervor dd { color: var(--gut); font-size: 1.05rem; }
+
+/* -------------------------------------------------------------- Tabellen */
+
+.tabellenrahmen { overflow-x: auto; margin-top: .5rem; -webkit-overflow-scrolling: touch; }
+.tabelle { width: 100%; border-collapse: collapse; font-size: .9rem; white-space: nowrap; }
+.tabelle th, .tabelle td { padding: .55rem .6rem; text-align: right; border-bottom: 1px solid var(--rand); }
+.tabelle thead th { color: var(--leise); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+.tabelle th:first-child, .tabelle td:first-child { text-align: left; }
+.tabelle tbody th { text-align: left; font-weight: 600; color: var(--leise); }
+.tabelle td { font-variant-numeric: tabular-nums; }
+.tabelle tbody tr:last-child td, .tabelle tbody tr:last-child th { border-bottom: 0; }
+.tabelle .gut { color: var(--gut); font-weight: 600; }
+.tabelle .schlecht { color: var(--warn); font-weight: 600; }
+.tabelle .werkzeuge { display: flex; gap: .3rem; justify-content: flex-end; }
+.tabelle .werkzeuge button {
+  min-height: 34px; padding: .25rem .6rem; font-size: .82rem;
+  background: transparent; border: 1px solid var(--rand); color: var(--leise);
+}
+.tabelle .werkzeuge button:hover { border-color: var(--akzent); color: var(--akzent); }
+
+/* ------------------------------------------------------ Meldungen, Fuß */
+
+.meldung {
+  margin: 1.25rem 0 0; padding: .8rem .9rem; border-radius: 11px;
+  border: 1px solid var(--rand); background: var(--karte); font-size: .92rem;
+}
+.meldung.fehler { border-color: var(--warn); color: var(--warn); }
+.meldung.gut { border-color: var(--gut); color: var(--gut); }
+
+.warnung {
+  margin-top: 1.25rem; padding: .8rem .9rem;
+  border-left: 3px solid var(--warn); background: var(--karte);
+  border-radius: 0 11px 11px 0; font-size: .9rem; color: var(--text);
+  border-top: 1px solid var(--rand); border-right: 1px solid var(--rand);
+  border-bottom: 1px solid var(--rand);
+}
+
+.fuss {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+  margin-top: 2rem; color: var(--leise); font-size: .82rem;
+}
+
+@media (max-width: 560px) {
+  .kopf h1 { font-size: 1.25rem; }
+  .kennzahl .wert { font-size: 1.4rem; }
+}

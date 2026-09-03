@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f766e">
+<title>Kostenberechnung E-Auto</title>
+<link rel="stylesheet" href="/stil.css">
+<link rel="icon" href="/zeichen.svg" type="image/svg+xml">
+</head>
+<body>
+
+<header class="kopf">
+  <div class="innen">
+    <h1>Kostenberechnung <span id="fahrzeugname">E-Auto</span></h1>
+    <p>Was das Laden kostet — und was dieselbe Strecke als Benziner gekostet hätte.</p>
+  </div>
+</header>
+
+<main class="innen">
+
+  <p id="meldung" class="meldung" hidden></p>
+
+  <!-- ------------------------------------------------------------ Eingabe -->
+  <section class="karte">
+    <h2>Ladung eintragen</h2>
+    <form id="formular" autocomplete="off">
+      <input type="hidden" id="f_id" value="">
+
+      <div class="schalter breitschalter" id="ortwahl">
+        <button type="button" data-ort="zuhause" class="aktiv">Zuhause geladen</button>
+        <button type="button" data-ort="auswaerts">Auswärts geladen</button>
+      </div>
+
+      <div class="felder">
+        <label>Datum
+          <input type="date" id="f_datum" required>
+        </label>
+        <label>Kilometerstand <span class="einheit">km</span>
+          <input type="text" inputmode="decimal" id="f_km" placeholder="z. B. 24380" required>
+        </label>
+        <label>Geladene Energie <span class="einheit">kWh</span>
+          <input type="text" inputmode="decimal" id="f_kwh" placeholder="z. B. 41,2" required>
+        </label>
+        <div class="feld">
+          <div class="feldkopf">
+            <span id="preis_beschriftung">Preis je kWh <span class="einheit">ct</span></span>
+            <span class="schalter klein" id="preisart">
+              <button type="button" data-art="tarif" class="aktiv">ct/kWh</button>
+              <button type="button" data-art="summe">Summe €</button>
+            </span>
+          </div>
+          <input type="text" inputmode="decimal" id="f_preis" placeholder="z. B. 34,0" required>
+        </div>
+        <label class="breit">Notiz <span class="einheit">optional</span>
+          <input type="text" id="f_notiz" placeholder="Schnelllader A7, Arbeitgeber, …">
+        </label>
+      </div>
+      <p class="hinweis" id="preis_hinweis"></p>
+      <div class="knopfreihe">
+        <button type="submit" class="haupt" id="f_speichern">Eintragen</button>
+        <button type="button" class="leise" id="f_abbrechen" hidden>Abbrechen</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="warnungen"></div>
+
+  <!-- ---------------------------------------------------------- Übersicht -->
+  <section class="karte" id="uebersicht">
+    <h2>Übersicht</h2>
+    <p class="unterzeile" id="zeitraum">Noch keine Auswertung möglich.</p>
+    <div class="kennzahlen">
+      <div class="kennzahl">
+        <span class="wert" id="k_verbrauch">–</span>
+        <span class="name">Ø Verbrauch<small>kWh/100 km</small></span>
+      </div>
+      <div class="kennzahl">
+        <span class="wert" id="k_preis_kwh">–</span>
+        <span class="name">Ø Strompreis<small>ct/kWh</small></span>
+      </div>
+      <div class="kennzahl">
+        <span class="wert" id="k_strecke">–</span>
+        <span class="name">Ausgewertete Strecke<small>km</small></span>
+      </div>
+      <div class="kennzahl">
+        <span class="wert" id="k_bezahlt">–</span>
+        <span class="name">Insgesamt geladen<small id="k_bezahlt_klein">€</small></span>
+      </div>
+    </div>
+
+    <h3 class="abstand">Wo geladen wurde</h3>
+    <div class="zwei" id="orte"></div>
+  </section>
+
+  <!-- --------------------------------------------------------- Vergleich -->
+  <section class="karte" id="vergleich">
+    <h2>Gegenüberstellung</h2>
+    <p class="unterzeile" id="vergleich_basis"></p>
+
+    <div class="saeulen">
+      <div class="saeule">
+        <div class="saeule_kopf"><span class="punkt strom"></span>Strom</div>
+        <div class="balken"><div class="fuellung strom" id="b_strom"></div></div>
+        <div class="saeule_wert" id="v_strom">–</div>
+      </div>
+      <div class="saeule">
+        <div class="saeule_kopf"><span class="punkt benzin"></span>Benzin</div>
+        <div class="balken"><div class="fuellung benzin" id="b_benzin"></div></div>
+        <div class="saeule_wert" id="v_benzin">–</div>
+      </div>
+    </div>
+
+    <p class="fazit" id="fazit"></p>
+
+    <div class="tabellenrahmen">
+      <table class="tabelle">
+        <thead>
+          <tr><th></th><th>Strom</th><th>Benzin</th><th>Differenz</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Gesamtkosten</th>
+            <td id="t_strom_gesamt">–</td><td id="t_benzin_gesamt">–</td><td id="t_diff_gesamt">–</td></tr>
+          <tr><th>Kosten je 100 km</th>
+            <td id="t_strom_100">–</td><td id="t_benzin_100">–</td><td id="t_diff_100">–</td></tr>
+          <tr><th>Verbrauch je 100 km</th>
+            <td id="t_strom_menge">–</td><td id="t_benzin_menge">–</td><td>–</td></tr>
+          <tr><th>Menge gesamt</th>
+            <td id="t_strom_menge_ges">–</td><td id="t_benzin_menge_ges">–</td><td>–</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------- Monat und Jahr -->
+  <section class="karte" id="zusammenfassung">
+    <h2>Monatlich und jährlich</h2>
+    <p class="unterzeile">Hochgerechnet aus dem gemessenen Zeitraum — gleiche Fahrleistung unterstellt.</p>
+    <div class="zwei">
+      <div class="block">
+        <h3>Pro Monat</h3>
+        <dl>
+          <div><dt>Fahrleistung</dt><dd id="m_km">–</dd></div>
+          <div><dt>Strom</dt><dd id="m_strom">–</dd></div>
+          <div><dt>Benzin wäre</dt><dd id="m_benzin">–</dd></div>
+          <div class="hervor"><dt>Ersparnis</dt><dd id="m_ersparnis">–</dd></div>
+        </dl>
+      </div>
+      <div class="block">
+        <h3>Pro Jahr</h3>
+        <dl>
+          <div><dt>Fahrleistung</dt><dd id="j_km">–</dd></div>
+          <div><dt>Strom</dt><dd id="j_strom">–</dd></div>
+          <div><dt>Benzin wäre</dt><dd id="j_benzin">–</dd></div>
+          <div class="hervor"><dt>Ersparnis</dt><dd id="j_ersparnis">–</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------ Verlauf -->
+  <section class="karte" id="verlauf">
+    <div class="karten_kopf">
+      <h2>Verlauf</h2>
+      <div class="schalter">
+        <button type="button" class="aktiv" data-sicht="monate">Monate</button>
+        <button type="button" data-sicht="jahre">Jahre</button>
+      </div>
+    </div>
+    <div class="tabellenrahmen">
+      <table class="tabelle" id="verlauf_tabelle">
+        <thead>
+          <tr><th>Zeitraum</th><th>km</th><th>kWh</th><th>Ø kWh/100</th>
+              <th>Strom</th><th>Benzin</th><th>Ersparnis</th></tr>
+        </thead>
+        <tbody id="verlauf_koerper"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- Liste -->
+  <section class="karte" id="liste">
+    <div class="karten_kopf">
+      <h2>Ladungen</h2>
+      <a class="leise knopf" href="/api/export.csv">CSV herunterladen</a>
+    </div>
+    <div class="tabellenrahmen">
+      <table class="tabelle">
+        <thead>
+          <tr><th>Datum</th><th>Ort</th><th>km-Stand</th><th>Strecke</th><th>kWh</th>
+              <th>Ø kWh/100</th><th>ct/kWh</th><th>Kosten</th><th></th></tr>
+        </thead>
+        <tbody id="liste_koerper"></tbody>
+      </table>
+    </div>
+    <p class="hinweis" id="liste_leer">Noch nichts eingetragen. Die erste Ladung ist der
+      Startpunkt — ein Verbrauch entsteht ab der zweiten.</p>
+  </section>
+
+  <!-- ------------------------------------------------------ Einstellungen -->
+  <section class="karte">
+    <h2>Einstellungen</h2>
+    <form id="einstellungen_formular" autocomplete="off">
+      <div class="felder">
+        <label>Benzinpreis <span class="einheit">€/l</span>
+          <input type="text" inputmode="decimal" id="e_benzinpreis">
+        </label>
+        <label>Verbrauch Benziner <span class="einheit">l/100 km</span>
+          <input type="text" inputmode="decimal" id="e_benzinverbrauch">
+        </label>
+        <label>Haustarif <span class="einheit">ct/kWh</span>
+          <input type="text" inputmode="decimal" id="e_strompreis">
+        </label>
+        <label>Fahrzeug <span class="einheit">Bezeichnung</span>
+          <input type="text" id="e_fahrzeug">
+        </label>
+      </div>
+      <p class="hinweis">Benzinpreis und Verbrauch bestimmen die Gegenüberstellung. Der
+        Haustarif füllt nur das Preisfeld vor, wenn du „Zuhause geladen“ wählst —
+        gerechnet wird immer mit dem, was je Ladung wirklich eingetragen ist.</p>
+      <div class="knopfreihe">
+        <button type="submit" class="haupt">Speichern</button>
+      </div>
+    </form>
+  </section>
+
+  <footer class="fuss">
+    <span>Kostenberechnung <span id="version"></span></span>
+    <span>Die Rechnung steht im README.</span>
+  </footer>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

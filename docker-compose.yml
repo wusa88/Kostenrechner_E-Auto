@@ -1,0 +1,31 @@
+# Stack für Portainer, Docker Compose oder Podman.
+#
+#   docker compose up -d      ->  http://<host>:8385
+#
+# In Portainer: Stacks -> Add stack -> Repository -> diese URL, Compose-Pfad
+# docker-compose.yml. Portainer baut das Abbild dann selbst aus dem Repository.
+
+services:
+  kostenberechnung:
+    build: .
+    # Statt selbst zu bauen kann auch das fertige Abbild aus der GitHub-
+    # Registry genommen werden (siehe .github/workflows/abbild.yml):
+    # image: ghcr.io/<benutzer>/kostenberechnung:latest
+    container_name: kostenberechnung
+    restart: unless-stopped
+    ports:
+      - "8385:8080"
+    volumes:
+      - kosten-daten:/daten
+    environment:
+      TZ: Europe/Berlin
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/gesundheit', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  kosten-daten:
