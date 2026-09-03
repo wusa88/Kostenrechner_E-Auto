@@ -45,6 +45,14 @@ Python 3.10 oder neuer, sonst nichts.
 Komma dürfen beide getippt werden: `41,2` und `41.2` sind dasselbe, `26.240` sind
 sechsundzwanzigtausendzweihundertvierzig.
 
+Das **Datum** steht als `TT.MM.JJJJ` da — unabhängig davon, welche Sprache im
+Browser eingestellt ist. (Ein natives `<input type="date">` richtet sich nach der
+Browsersprache und zeigt bei englischer Einstellung `MM/DD/YYYY`; deshalb ist es
+hier ein Textfeld.) Getippt werden darf großzügig: `3.9.26`, `3/9/2026` und
+`2026-09-03` landen alle auf dem 3. September 2026, und beim Verlassen des Feldes
+wird sauber ausgeschrieben. Der Knopf daneben öffnet den Kalender des Browsers —
+am Handy der bequemere Weg.
+
 **Zwei Schalter für den Preis**, weil man je nach Ladeort etwas anderes weiß:
 
 | Schalter | Wahl | wofür |
