@@ -34,8 +34,20 @@
       </div>
 
       <div class="felder">
-        <label>Datum
-          <input type="date" id="f_datum" required>
+        <label for="f_datum">Datum <span class="einheit">TT.MM.JJJJ</span>
+          <span class="datumsfeld">
+            <input type="text" id="f_datum" placeholder="03.09.2026"
+                   autocomplete="off" required>
+            <input type="date" id="f_kalender" class="kalender" tabindex="-1" aria-hidden="true">
+            <button type="button" id="f_kalenderknopf" aria-label="Kalender öffnen" title="Kalender öffnen">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <rect x="3" y="5" width="18" height="16" rx="2.5" fill="none"
+                      stroke="currentColor" stroke-width="1.8"/>
+                <path d="M3 10h18M8 3v4M16 3v4" fill="none" stroke="currentColor"
+                      stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </span>
         </label>
         <label>Kilometerstand <span class="einheit">km</span>
           <input type="text" inputmode="decimal" id="f_km" placeholder="z. B. 24380" required>
