@@ -111,6 +111,7 @@
     if (!$("e_benzinpreis").matches(":focus")) $("e_benzinpreis").value = komma(gelesen(e.benzinpreis), 2);
     if (!$("e_benzinverbrauch").matches(":focus")) $("e_benzinverbrauch").value = komma(gelesen(e.benzinverbrauch), 1);
     if (!$("e_strompreis").matches(":focus")) $("e_strompreis").value = komma(gelesen(e.strompreis), 1);
+    if (!$("e_kapazitaet").matches(":focus")) $("e_kapazitaet").value = komma(gelesen(e.kapazitaet), 1);
     if (!$("e_fahrzeug").matches(":focus")) $("e_fahrzeug").value = e.fahrzeug || "";
 
     if (!$("f_datum").value) datumSetzen(daten.heute);
@@ -140,6 +141,56 @@
       : a.anzahl === 1
         ? "Erst ab der zweiten Ladung entsteht eine Strecke und damit ein Verbrauch."
         : "Noch keine Auswertung möglich.";
+
+    vorlaeufig(a);
+  }
+
+  /* Sagt, wie belastbar der Verbrauch schon ist — statt eine Zahl vorzugeben,
+     die sich mit der nächsten Ladung noch halbieren kann. */
+  function vorlaeufig(a) {
+    const feld = $("vorlaeufig");
+    const v = a.verlaesslichkeit;
+    const g = a.gesamt;
+    if (!g || !v) { feld.hidden = true; return; }
+    feld.hidden = false;
+
+    // 1. Ladestand vorhanden und verrechnet: der Verbrauch ist gemessen.
+    if (v.gemessen) {
+      const A = v.ausgleich;
+      const richtung = Math.abs(A) < 0.05
+        ? "Der Akku stand am Anfang und am Ende gleich — nichts auszugleichen."
+        : A > 0
+          ? `Der Akku war am Ende leerer als am Anfang; die fehlenden ` +
+            `<strong>${kwh(A)}</strong> sind eingerechnet.`
+          : `Der Akku war am Ende voller als am Anfang; die zusätzlichen ` +
+            `<strong>${kwh(-A)}</strong> sind herausgerechnet.`;
+      feld.innerHTML =
+        `<strong>Mit dem Ladestand gerechnet.</strong> ${richtung} Der Verbrauch ist ` +
+        `damit gemessen, nicht geschätzt. In den Kosten steckt diese Energie nicht — ` +
+        `bezahlt wurde, was bezahlt wurde.`;
+      return;
+    }
+
+    // 2. Ladestände da, aber keine Kapazität: ein Feld fehlt noch.
+    const kapazitaet = zustand ? gelesen(zustand.einstellungen.kapazitaet) : null;
+    if (v.mit_ladestand > 0 && !kapazitaet) {
+      feld.innerHTML =
+        `<strong>Fast.</strong> Du schreibst den Ladestand mit — es fehlt nur noch die ` +
+        `<strong>nutzbare Akkukapazität</strong> unten in den Einstellungen. Damit wird ` +
+        `aus dem geschätzten Verbrauch ein gemessener.`;
+      return;
+    }
+
+    // 3. Gar nichts da: sagen, wie groß der Spielraum ist.
+    if (!v.vorlaeufig || !da(v.spanne)) { feld.hidden = true; return; }
+    feld.innerHTML =
+      `<strong>Noch vorläufig.</strong> Der Rechner weiß nicht, wie voll der Akku ` +
+      `am Anfang und am Ende war — er sieht nur, was du geladen hast. Lädst du nach ` +
+      `einer Strecke weniger nach, als du verfahren hast, fällt der Verbrauch zu ` +
+      `niedrig aus; lädst du mehr, zu hoch. Auf ${km(g.strecke)} macht das bis zu ` +
+      `<strong>±${zahl1(v.spanne)} kWh/100 km</strong> aus. Genauer wird es von selbst ` +
+      `mit jedem Kilometer — oder sofort, wenn du bei zwei Ladungen den Ladestand ` +
+      `mitschreibst und unten die Akkukapazität einträgst.`;
   }
 
   function orte(a) {
@@ -165,6 +216,7 @@
       $("v_strom").textContent = $("v_benzin").textContent = leer;
       $("fazit").textContent = "";
       $("vergleich_basis").textContent = "";
+      $("vergleich_umfang").hidden = true;
       ["t_strom_gesamt", "t_benzin_gesamt", "t_diff_gesamt", "t_strom_100", "t_benzin_100",
        "t_diff_100", "t_strom_menge", "t_benzin_menge", "t_strom_menge_ges", "t_benzin_menge_ges"]
         .forEach((id) => { $(id).textContent = leer; });
@@ -180,6 +232,8 @@
     $("vergleich_basis").textContent =
       `${f0.format(g.strecke)} km, verglichen mit ${komma(gelesen(e.benzinverbrauch), 1)} l/100 km ` +
       `zu ${komma(gelesen(e.benzinpreis), 2)} €/l.`;
+
+    umfang(a);
 
     const gespart = g.ersparnis;
     $("fazit").innerHTML = gespart >= 0
@@ -198,6 +252,21 @@
     $("t_benzin_menge").textContent = komma(gelesen(e.benzinverbrauch), 1) + " l";
     $("t_strom_menge_ges").textContent = kwh(g.kwh);
     $("t_benzin_menge_ges").textContent = liter(g.liter);
+  }
+
+  /* Welche Ladungen im Vergleich stecken — die erste gehört nicht dazu. */
+  function umfang(a) {
+    const feld = $("vergleich_umfang");
+    const aus = a.aussen_vor;
+    feld.hidden = !(aus && aus.anzahl > 0);
+    if (feld.hidden) return;
+
+    const gezaehlt = a.anzahl - aus.anzahl;
+    feld.innerHTML =
+      `Im Strom stecken <strong>${f0.format(gezaehlt)} von ${f0.format(a.anzahl)} Ladungen</strong>. ` +
+      `Die erste (${kwh(aus.kwh)} für ${euro(aus.kosten)}) ist nur der Startpunkt der Strecke: ` +
+      `Was vor ihr gefahren wurde, weiß der Rechner nicht, also zählt sie nicht mit. ` +
+      `In „Insgesamt geladen“ oben steht sie sehr wohl — das ist dein bezahltes Geld.`;
   }
 
   function ersparnis(wert) {
@@ -261,7 +330,8 @@
         <td><span class="marke ${l.ort}">${name}</span></td>
         <td>${f0.format(l.km)}</td>
         <td>${p && p.gueltig ? f0.format(p.strecke) + " km" : leer}</td>
-        <td>${f1.format(l.kwh)}</td>
+        <td>${f1.format(l.kwh)}${l.soc === null || l.soc === undefined ? ""
+          : ` <span class="klein">→ ${f0.format(l.soc)} %</span>`}</td>
         <td>${p && p.gueltig ? zahl1(p.verbrauch) : leer}</td>
         <td>${da(preis) ? f1.format(preis * 100) : leer}</td>
         <td>${euro(l.kosten)}</td>
@@ -357,6 +427,7 @@
     datumSetzen(l ? l.datum : (zustand ? zustand.heute : ""));
     $("f_km").value = l ? komma(l.km, 0) : "";
     $("f_kwh").value = l ? komma(l.kwh, 2) : "";
+    $("f_soc").value = l && l.soc !== null && l.soc !== undefined ? komma(l.soc, 0) : "";
     $("f_notiz").value = l ? l.notiz : "";
     $("f_speichern").textContent = l ? "Änderung speichern" : "Eintragen";
     $("f_abbrechen").hidden = !l;
@@ -388,6 +459,7 @@
       datum: iso,
       km: $("f_km").value,
       kwh: $("f_kwh").value,
+      soc: $("f_soc").value,
       notiz: $("f_notiz").value,
       ort: ort,
     };
@@ -488,6 +560,7 @@
             benzinpreis: $("e_benzinpreis").value,
             benzinverbrauch: $("e_benzinverbrauch").value,
             strompreis: $("e_strompreis").value,
+            kapazitaet: $("e_kapazitaet").value,
             fahrzeug: $("e_fahrzeug").value,
           }),
         }));

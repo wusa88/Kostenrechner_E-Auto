@@ -65,6 +65,7 @@ def _text_zu_zahl(text: str) -> float:
 
 
 def zahl(wert, feld: str, *, minimum: float | None = 0.0,
+         hoechstens: float | None = None,
          pflicht: bool = True, standard: float = 0.0) -> float:
     """Nimmt 12,5 genauso wie 12.5 und raeumt Einheiten weg."""
     if wert is None or (isinstance(wert, str) and not wert.strip()):
@@ -82,6 +83,8 @@ def zahl(wert, feld: str, *, minimum: float | None = 0.0,
         raise Eingabefehler(f"{feld}: keine gültige Zahl.")
     if minimum is not None and gelesen < minimum:
         raise Eingabefehler(f"{feld} darf nicht kleiner als {minimum:g} sein.")
+    if hoechstens is not None and gelesen > hoechstens:
+        raise Eingabefehler(f"{feld} darf nicht größer als {hoechstens:g} sein.")
     return gelesen
 
 
@@ -129,6 +132,9 @@ def ladung_aus_daten(daten: dict) -> dict:
         tarif = None
         kosten = zahl(daten.get("kosten"), "Kosten der Ladung", minimum=0.0)
 
+    soc = daten.get("soc")
+    hat_soc = soc is not None and str(soc).strip() != ""
+
     return {
         "datum": datum_aus(daten.get("datum")),
         "km": zahl(daten.get("km"), "Kilometerstand"),
@@ -137,6 +143,7 @@ def ladung_aus_daten(daten: dict) -> dict:
         "notiz": str(daten.get("notiz") or "").strip()[:200],
         "ort": ort_aus(daten.get("ort")),
         "tarif": tarif,
+        "soc": zahl(soc, "Ladestand", minimum=0.0, hoechstens=100.0) if hat_soc else None,
     }
 
 
@@ -148,6 +155,7 @@ def zustand() -> dict:
         liste,
         benzinpreis=float(werte["benzinpreis"]),
         benzinverbrauch=float(werte["benzinverbrauch"]),
+        kapazitaet=float(werte.get("kapazitaet") or 0.0),
     )
     return {
         "version": __version__,
@@ -163,6 +171,7 @@ def zustand() -> dict:
                 "notiz": l.notiz,
                 "ort": l.ort,
                 "tarif": l.tarif,
+                "soc": l.soc,
             }
             for l in liste
         ],
@@ -174,7 +183,8 @@ def csv_export() -> bytes:
     puffer = io.StringIO()
     schreiber = csv.writer(puffer, delimiter=";")
     schreiber.writerow(
-        ["Datum", "Kilometerstand", "kWh", "Kosten EUR", "ct/kWh", "Ort", "Notiz"])
+        ["Datum", "Kilometerstand", "kWh", "Kosten EUR", "ct/kWh", "Ladestand %",
+         "Ort", "Notiz"])
     for l in speicher.ladungen():
         schreiber.writerow([
             l.datum.isoformat(),
@@ -182,6 +192,7 @@ def csv_export() -> bytes:
             f"{l.kwh:.3f}".replace(".", ","),
             f"{l.kosten:.2f}".replace(".", ","),
             f"{l.kosten / l.kwh * 100:.2f}".replace(".", ",") if l.kwh else "",
+            "" if l.soc is None else f"{l.soc:.0f}",
             ORTSNAMEN[l.ort],
             l.notiz,
         ])
@@ -302,6 +313,10 @@ class Weg(BaseHTTPRequestHandler):
                     daten["benzinverbrauch"], "Benzinverbrauch", minimum=0.0)
             if "strompreis" in daten:
                 neu["strompreis"] = zahl(daten["strompreis"], "Strompreis", minimum=0.0)
+            if "kapazitaet" in daten:
+                neu["kapazitaet"] = zahl(
+                    daten["kapazitaet"], "Akkukapazität", minimum=0.0, hoechstens=500.0,
+                    pflicht=False)
             if "fahrzeug" in daten:
                 neu["fahrzeug"] = str(daten["fahrzeug"]).strip()[:60] or "Mein E-Auto"
             speicher.einstellungen_setzen(neu)

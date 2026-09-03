@@ -29,14 +29,17 @@ STANDARD_EINSTELLUNGEN: dict[str, object] = {
     "benzinverbrauch": 7.2,
     # Haustarif in ct/kWh — Vorbelegung fuer Ladungen zuhause.
     "strompreis": 34.0,
+    # Nutzbare Akkukapazitaet in kWh; 0 = nicht angegeben, dann bleibt der
+    # Ladestand ohne Wirkung.
+    "kapazitaet": 0.0,
     # Beschriftung der Oberflaeche.
     "fahrzeug": "Mein E-Auto",
 }
 
-ZAHLENFELDER = ("benzinpreis", "benzinverbrauch", "strompreis")
+ZAHLENFELDER = ("benzinpreis", "benzinverbrauch", "strompreis", "kapazitaet")
 
 # Reihenfolge der Schluessel je Ladung — so steht es auch in der Datei.
-FELDER = ("id", "datum", "km", "kwh", "kosten", "tarif", "ort", "notiz", "angelegt")
+FELDER = ("id", "datum", "km", "kwh", "kosten", "tarif", "soc", "ort", "notiz", "angelegt")
 
 _lock = threading.RLock()
 
@@ -96,7 +99,7 @@ def _schreiben(daten: dict) -> None:
 
     # Damit die Datei lesbar bleibt — Cent-Bruchteile gehen dabei nicht verloren.
     for eintrag in daten["ladungen"]:
-        for feld, stellen in (("km", 3), ("kwh", 3), ("kosten", 6), ("tarif", 6)):
+        for feld, stellen in (("km", 3), ("kwh", 3), ("kosten", 6), ("tarif", 6), ("soc", 2)):
             eintrag[feld] = _knapp(eintrag[feld], stellen)
     for feld in ZAHLENFELDER:
         daten["einstellungen"][feld] = _knapp(daten["einstellungen"][feld], 4)
@@ -135,6 +138,7 @@ def _einstellungen_pruefen(werte: dict) -> dict:
 def _ladung_pruefen(eintrag: dict) -> dict:
     """Macht aus einem Eintrag der Datei einen mit allen Feldern."""
     tarif = eintrag.get("tarif")
+    soc = eintrag.get("soc")
     ort = str(eintrag.get("ort") or "zuhause")
     return {
         "id": int(_zahl(eintrag.get("id"), 0)),
@@ -143,6 +147,7 @@ def _ladung_pruefen(eintrag: dict) -> dict:
         "kwh": _zahl(eintrag.get("kwh"), 0.0),
         "kosten": _zahl(eintrag.get("kosten"), 0.0),
         "tarif": None if tarif in (None, "") else _zahl(tarif, 0.0),
+        "soc": None if soc in (None, "") else min(100.0, max(0.0, _zahl(soc, 0.0))),
         "ort": ort if ort in ORTE else "zuhause",
         "notiz": str(eintrag.get("notiz") or ""),
         "angelegt": str(eintrag.get("angelegt") or ""),
@@ -173,6 +178,7 @@ def _zu_ladung(eintrag: dict) -> Ladung:
         notiz=eintrag["notiz"],
         ort=eintrag["ort"],
         tarif=eintrag["tarif"],
+        soc=eintrag["soc"],
     )
 
 
@@ -184,7 +190,8 @@ def ladungen() -> list[Ladung]:
 
 
 def ladung_anlegen(datum: date, km: float, kwh: float, kosten: float, notiz: str = "",
-                   ort: str = "zuhause", tarif: float | None = None) -> int:
+                   ort: str = "zuhause", tarif: float | None = None,
+                   soc: float | None = None) -> int:
     with _lock:
         daten = _lesen()
         kennung = max((e["id"] for e in daten["ladungen"]), default=0) + 1
@@ -195,6 +202,7 @@ def ladung_anlegen(datum: date, km: float, kwh: float, kosten: float, notiz: str
             "kwh": kwh,
             "kosten": kosten,
             "tarif": tarif,
+            "soc": soc,
             "ort": ort,
             "notiz": notiz,
             "angelegt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -205,14 +213,14 @@ def ladung_anlegen(datum: date, km: float, kwh: float, kosten: float, notiz: str
 
 def ladung_aendern(kennung: int, datum: date, km: float, kwh: float,
                    kosten: float, notiz: str = "", ort: str = "zuhause",
-                   tarif: float | None = None) -> bool:
+                   tarif: float | None = None, soc: float | None = None) -> bool:
     with _lock:
         daten = _lesen()
         for eintrag in daten["ladungen"]:
             if eintrag["id"] != kennung:
                 continue
             eintrag.update(datum=datum.isoformat(), km=km, kwh=kwh, kosten=kosten,
-                           tarif=tarif, ort=ort, notiz=notiz)
+                           tarif=tarif, soc=soc, ort=ort, notiz=notiz)
             _schreiben(daten)
             return True
     return False

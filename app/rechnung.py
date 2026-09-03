@@ -8,6 +8,17 @@ verbraucht wurde. Die Strecke zwischen zwei Kilometerstaenden wird also mit der
 Energie der *spaeteren* Ladung bewertet. Die allererste Ladung hat noch keine
 zugehoerige Strecke und zaehlt darum nicht in den Verbrauch — ihr Geld taucht
 nur in "gesamt bezahlt" auf.
+
+Das ist genau dann exakt, wenn der Akku am Anfang und am Ende gleich voll ist —
+nicht "voll", sondern *gleich*. Weil das beim E-Auto selten zutrifft, darf zu
+jeder Ladung der Ladestand in Prozent mitgeschrieben werden. Zusammen mit der
+nutzbaren Akkukapazitaet wird daraus die fehlende Groesse:
+
+    verbrauchte Energie = geladene Energie + (Ladestand vorher - nachher) * Kapazitaet
+
+Ueber eine Kette von Ladungen kuerzen sich die Zwischenwerte weg: fuer eine
+Spanne zaehlen nur der Ladestand ihrer ersten und ihrer letzten Ladung. Wer nur
+diese beiden eintraegt, bekommt die Spanne trotzdem exakt.
 """
 
 from __future__ import annotations
@@ -39,6 +50,7 @@ class Ladung:
     notiz: str = ""
     ort: str = "zuhause"   # zuhause | auswaerts
     tarif: float | None = None   # EUR/kWh, falls je kWh statt als Summe eingetragen
+    soc: float | None = None     # Ladestand in Prozent NACH dieser Ladung
 
 
 def datum_lesen(wert) -> date:
@@ -85,7 +97,10 @@ def perioden(ladungen: list[Ladung]) -> tuple[list[dict], list[str]]:
 
         ergebnis.append({
             "id": jetzt.id,
+            "von_id": vorher.id,
             "ort": jetzt.ort,
+            "soc_von": vorher.soc,
+            "soc_bis": jetzt.soc,
             "von": vorher.datum,
             "bis": jetzt.datum,
             "tage": tage,
@@ -103,6 +118,24 @@ def perioden(ladungen: list[Ladung]) -> tuple[list[dict], list[str]]:
     return ergebnis, warnungen
 
 
+def korrektur(spanne: list[dict], kapazitaet: float) -> float | None:
+    """Die Energie, die der Akku ueber diese Spanne mehr abgegeben als aufgenommen hat.
+
+    Verlangt den Ladestand der ersten und der letzten Ladung der Spanne, eine
+    Kapazitaet und eine luekenlose Kette dazwischen. Fehlt eines davon, gibt es
+    keine Korrektur — dann bleibt es bei der Schaetzung.
+    """
+    if not spanne or kapazitaet <= 0:
+        return None
+    for vorher, jetzt in zip(spanne, spanne[1:]):
+        if vorher["id"] != jetzt["von_id"]:
+            return None          # eine unbrauchbare Periode dazwischen: Kette gerissen
+    anfang, ende = spanne[0]["soc_von"], spanne[-1]["soc_bis"]
+    if anfang is None or ende is None:
+        return None
+    return (anfang - ende) / 100.0 * kapazitaet
+
+
 def _benzin(strecke: float, benzinpreis: float, benzinverbrauch: float) -> dict:
     liter = strecke * benzinverbrauch / 100.0
     return {
@@ -113,13 +146,23 @@ def _benzin(strecke: float, benzinpreis: float, benzinverbrauch: float) -> dict:
 
 
 def _block(strecke: float, kwh: float, strom: float,
-           benzinpreis: float, benzinverbrauch: float) -> dict:
-    """Ein Satz Kennzahlen fuer eine Strecke: Strom, Benzin, Differenz."""
+           benzinpreis: float, benzinverbrauch: float,
+           ausgleich: float | None = None) -> dict:
+    """Ein Satz Kennzahlen fuer eine Strecke: Strom, Benzin, Differenz.
+
+    `ausgleich` ist die aus dem Ladestand errechnete Energie: positiv, wenn der
+    Akku am Ende leerer war als am Anfang. Sie geht in den Verbrauch ein, nicht
+    in die Kosten — bezahlt wurde, was bezahlt wurde.
+    """
     benzin = _benzin(strecke, benzinpreis, benzinverbrauch)
+    verbraucht = kwh + (ausgleich or 0.0)
     return {
         "strecke": strecke,
         "kwh": kwh,
-        "verbrauch": _teilen(kwh * 100.0, strecke),
+        "ausgleich": ausgleich,
+        "gemessen": ausgleich is not None,
+        "kwh_verbraucht": verbraucht,
+        "verbrauch": _teilen(verbraucht * 100.0, strecke),
         "strom_kosten": strom,
         "strom_100": _teilen(strom * 100.0, strecke),
         "preis_kwh": _teilen(strom, kwh),
@@ -133,7 +176,8 @@ def _block(strecke: float, kwh: float, strom: float,
 
 
 def _zeitraeume(gueltige: list[dict], schluessel, beschriftung,
-                benzinpreis: float, benzinverbrauch: float) -> list[dict]:
+                benzinpreis: float, benzinverbrauch: float,
+                kapazitaet: float = 0.0) -> list[dict]:
     """Fasst Perioden zu Kalendermonaten oder -jahren zusammen.
 
     Eine Ladung zaehlt in den Zeitraum ihres Datums — nicht anteilig ueber den
@@ -143,15 +187,18 @@ def _zeitraeume(gueltige: list[dict], schluessel, beschriftung,
     for p in gueltige:
         k = schluessel(p["bis"])
         eintrag = eimer.setdefault(k, {"schluessel": k, "titel": beschriftung(p["bis"]),
-                                       "strecke": 0.0, "kwh": 0.0, "strom": 0.0, "ladungen": 0})
+                                       "strecke": 0.0, "kwh": 0.0, "strom": 0.0,
+                                       "ladungen": 0, "spanne": []})
         eintrag["strecke"] += p["strecke"]
         eintrag["kwh"] += p["kwh"]
         eintrag["strom"] += p["kosten"]
         eintrag["ladungen"] += 1
+        eintrag["spanne"].append(p)
 
     reihen = []
     for e in sorted(eimer.values(), key=lambda e: e["schluessel"]):
-        werte = _block(e["strecke"], e["kwh"], e["strom"], benzinpreis, benzinverbrauch)
+        werte = _block(e["strecke"], e["kwh"], e["strom"], benzinpreis, benzinverbrauch,
+                       korrektur(e["spanne"], kapazitaet))
         werte.update(schluessel=e["schluessel"], titel=e["titel"], ladungen=e["ladungen"])
         reihen.append(werte)
     return reihen
@@ -180,10 +227,53 @@ def nach_orten(ladungen: list[Ladung]) -> list[dict]:
     return reihen
 
 
-def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float) -> dict:
+# Ab dieser Groesse gilt die Unsicherheit als klein genug, um sie nicht mehr
+# eigens zu erwaehnen: ein Sechstel des Verbrauchs.
+GRENZE_VORLAEUFIG = 1 / 6
+
+
+def verlaesslichkeit(ladungen: list[Ladung], gueltige: list[dict],
+                     strecke: float, verbrauch: float | None,
+                     ausgleich: float | None = None) -> dict:
+    """Wie belastbar ist der Verbrauch schon?
+
+    Der Rechner weiss nicht, wie voll der Akku beim ersten und beim letzten
+    Eintrag war — er sieht nur, was geladen wurde. Wer nach 134 km bloss 12 kWh
+    nachlaedt, hat den Rest aus dem Akku gefahren; der Verbrauch faellt dann zu
+    niedrig aus. Der Fehler ist durch den Ladehub begrenzt, und die groesste je
+    eingetragene Ladung ist dafuer der beste Anhaltspunkt, den die Daten hergeben.
+    Er waechst nicht mit — die Strecke schon. Deshalb mittelt sich das heraus.
+    """
+    groesste = max((l.kwh for l in ladungen), default=0.0)
+    spanne = _teilen(groesste * 100.0, strecke)
+    mit_soc = sum(1 for l in ladungen if l.soc is not None)
+    return {
+        "perioden": len(gueltige),
+        "spanne": spanne,
+        "gemessen": ausgleich is not None,
+        "ausgleich": ausgleich,
+        "ausgleich_100": _teilen((ausgleich or 0.0) * 100.0, strecke) if ausgleich is not None else None,
+        "mit_ladestand": mit_soc,
+        "vorlaeufig": bool(
+            ausgleich is None and spanne is not None
+            and verbrauch and spanne > verbrauch * GRENZE_VORLAEUFIG),
+    }
+
+
+def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float,
+              kapazitaet: float = 0.0) -> dict:
     """Die vollstaendige Auswertung, fertig fuer die Oberflaeche."""
     liste, warnungen = perioden(ladungen)
     gueltige = [p for p in liste if p["gueltig"]]
+
+    # Je Periode: steht der Ladestand an beiden Enden, ist ihr Verbrauch gemessen.
+    for p in liste:
+        eigen = korrektur([p], kapazitaet) if p["gueltig"] else None
+        p["ausgleich"] = eigen
+        p["gemessen"] = eigen is not None
+        p["kwh_verbraucht"] = None if not p["gueltig"] else p["kwh"] + (eigen or 0.0)
+        if p["gueltig"]:
+            p["verbrauch"] = p["kwh_verbraucht"] * 100.0 / p["strecke"]
 
     gesamt_kwh = sum(l.kwh for l in ladungen)
     gesamt_kosten = sum(l.kosten for l in ladungen)
@@ -202,6 +292,11 @@ def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float
             "preis_kwh": _teilen(gesamt_kosten, gesamt_kwh),
         },
         "orte": nach_orten(ladungen),
+        "aussen_vor": {
+            "anzahl": len(ladungen) - len(gueltige),
+            "kwh": gesamt_kwh - kwh,
+            "kosten": gesamt_kosten - strom,
+        },
         "auswertbar": bool(gueltige),
         "warnungen": warnungen,
         "perioden": [
@@ -215,9 +310,13 @@ def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float
         ergebnis["gesamt"] = None
         ergebnis["hochrechnung"] = None
         ergebnis["zeitraum"] = None
+        ergebnis["verlaesslichkeit"] = verlaesslichkeit(ladungen, gueltige, 0.0, None)
         return ergebnis
 
-    ergebnis["gesamt"] = _block(strecke, kwh, strom, benzinpreis, benzinverbrauch)
+    ausgleich = korrektur(gueltige, kapazitaet)
+    ergebnis["gesamt"] = _block(strecke, kwh, strom, benzinpreis, benzinverbrauch, ausgleich)
+    ergebnis["verlaesslichkeit"] = verlaesslichkeit(
+        ladungen, gueltige, strecke, ergebnis["gesamt"]["verbrauch"], ausgleich)
 
     von = min(p["von"] for p in gueltige)
     bis = max(p["bis"] for p in gueltige)
@@ -226,20 +325,22 @@ def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float
 
     # Hochrechnung: gemessener Tagesschnitt, hochgerechnet auf Monat und Jahr.
     if tage > 0:
-        ergebnis["hochrechnung"] = {
-            "monat": _block(strecke / tage * TAGE_MONAT, kwh / tage * TAGE_MONAT,
-                            strom / tage * TAGE_MONAT, benzinpreis, benzinverbrauch),
-            "jahr": _block(strecke / tage * TAGE_JAHR, kwh / tage * TAGE_JAHR,
-                           strom / tage * TAGE_JAHR, benzinpreis, benzinverbrauch),
-        }
+        def hoch(faktor: float) -> dict:
+            anteil = faktor / tage
+            return _block(strecke * anteil, kwh * anteil, strom * anteil,
+                          benzinpreis, benzinverbrauch,
+                          None if ausgleich is None else ausgleich * anteil)
+
+        ergebnis["hochrechnung"] = {"monat": hoch(TAGE_MONAT), "jahr": hoch(TAGE_JAHR)}
     else:
         ergebnis["hochrechnung"] = None
 
     ergebnis["monate"] = _zeitraeume(
         gueltige, lambda d: f"{d.year:04d}-{d.month:02d}",
-        lambda d: f"{MONATSNAMEN[d.month - 1]} {d.year}", benzinpreis, benzinverbrauch)
+        lambda d: f"{MONATSNAMEN[d.month - 1]} {d.year}",
+        benzinpreis, benzinverbrauch, kapazitaet)
     ergebnis["jahre"] = _zeitraeume(
         gueltige, lambda d: f"{d.year:04d}", lambda d: str(d.year),
-        benzinpreis, benzinverbrauch)
+        benzinpreis, benzinverbrauch, kapazitaet)
 
     return ergebnis

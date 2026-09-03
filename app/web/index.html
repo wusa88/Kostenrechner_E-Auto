@@ -65,6 +65,9 @@
           </div>
           <input type="text" inputmode="decimal" id="f_preis" placeholder="z. B. 34,0" required>
         </div>
+        <label>Ladestand danach <span class="einheit">% · optional</span>
+          <input type="text" inputmode="decimal" id="f_soc" placeholder="z. B. 80">
+        </label>
         <label class="breit">Notiz <span class="einheit">optional</span>
           <input type="text" id="f_notiz" placeholder="Schnelllader A7, Arbeitgeber, …">
         </label>
@@ -102,6 +105,8 @@
       </div>
     </div>
 
+    <p class="hinweis merksatz" id="vorlaeufig" hidden></p>
+
     <h3 class="abstand">Wo geladen wurde</h3>
     <div class="zwei" id="orte"></div>
   </section>
@@ -110,6 +115,7 @@
   <section class="karte" id="vergleich">
     <h2>Gegenüberstellung</h2>
     <p class="unterzeile" id="vergleich_basis"></p>
+    <p class="hinweis merksatz" id="vergleich_umfang" hidden></p>
 
     <div class="saeulen">
       <div class="saeule">
@@ -224,6 +230,9 @@
         <label>Haustarif <span class="einheit">ct/kWh</span>
           <input type="text" inputmode="decimal" id="e_strompreis">
         </label>
+        <label>Nutzbare Akkukapazität <span class="einheit">kWh</span>
+          <input type="text" inputmode="decimal" id="e_kapazitaet" placeholder="0 = unbekannt">
+        </label>
         <label>Fahrzeug <span class="einheit">Bezeichnung</span>
           <input type="text" id="e_fahrzeug">
         </label>
@@ -231,6 +240,11 @@
       <p class="hinweis">Benzinpreis und Verbrauch bestimmen die Gegenüberstellung. Der
         Haustarif füllt nur das Preisfeld vor, wenn du „Zuhause geladen“ wählst —
         gerechnet wird immer mit dem, was je Ladung wirklich eingetragen ist.</p>
+      <p class="hinweis">Die <strong>Akkukapazität</strong> braucht der Rechner nur, wenn du
+        den Ladestand mitschreibst: Aus zwei Prozentwerten und der Kapazität wird die
+        Energie, die im Akku mehr oder weniger übrig war — und damit aus dem geschätzten
+        Verbrauch ein gemessener. Gemeint ist die <em>nutzbare</em> Kapazität (netto), wie
+        sie im Datenblatt steht. Bleibt sie auf 0, bleibt der Ladestand ohne Wirkung.</p>
       <div class="knopfreihe">
         <button type="submit" class="haupt">Speichern</button>
       </div>

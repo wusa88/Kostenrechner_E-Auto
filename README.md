@@ -65,6 +65,9 @@ eintragen — viele Säulen rechnen genau so ab. Nur wenn eine Standgebühr oder
 Sessionpreis dazukommt, ist der Betrag von der Quittung die Wahrheit, denn den
 kann man aus dem kWh-Preis nicht mehr zurückrechnen.
 
+Der **Ladestand danach** ist optional — was er bringt, steht weiter unten unter
+*Genau statt geschätzt*.
+
 Unter dem Feld steht immer live die andere Darstellung — `41,2 kWh × 34,0 ct =
 14,01 €` beziehungsweise `27,84 € ÷ 41,2 kWh = 67,6 ct/kWh`. Ein Vertipper fällt
 so sofort auf. Wer die Eingabeart umschaltet, nachdem er schon etwas eingetragen
@@ -92,9 +95,71 @@ Verbrauch (kWh/100 km) = kWh dieser Ladung / gefahrene km seit der letzten Ladun
 ```
 
 Über den Gesamtzeitraum summiert sich das zu allen gefahrenen Kilometern gegen
-alle Ladungen ab der zweiten. Dass ein E-Auto selten randvoll geladen wird,
-mittelt sich über viele Ladungen heraus; übrig bleibt nur der Unterschied im
-Ladestand zwischen erstem und letztem Eintrag.
+alle Ladungen ab der zweiten.
+
+### Warum der Verbrauch am Anfang schwankt
+
+Der Rechner sieht nur, was geladen wurde — **nicht, wie voll der Akku ist**. Genau
+das fehlt aber zur Rechnung. Ein Beispiel:
+
+| | |
+|---|---|
+| 1. Eintrag | 34 962 km, 27,9 kWh geladen |
+| 2. Eintrag | 35 096 km, 12,0 kWh geladen |
+
+134 km gefahren, danach 12 kWh nachgeladen — macht 9,0 kWh/100 km. Gefahren
+wurden aber eher 23 kWh; der Rest kam aus dem Akku, der jetzt entsprechend leerer
+ist. Die 27,9 kWh der ersten Ladung sind dabei **nicht** mitgerechnet (sonst kämen
+29,8 heraus): Was vor der ersten Ladung gefahren wurde, weiß der Rechner nicht,
+also ist sie nur der Startpunkt der Strecke.
+
+Der Fehler ist immer derselbe: der Unterschied im Ladestand zwischen der ersten
+und der letzten Ladung. Er wächst nicht mit — der Akku bleibt gleich groß, die
+Strecke wird länger. Nach 134 km sind das ±20,8 kWh/100 km, nach 14 000 km noch
+±0,4. Deshalb schreibt die Übersicht dazu, **wie groß dieser Spielraum gerade
+ist**, solange er ins Gewicht fällt, statt eine Zahl als gesichert auszugeben.
+
+Als Maß für den möglichen Ladehub nimmt der Rechner die größte je eingetragene
+Ladung — der beste Anhaltspunkt, den die Daten selbst hergeben.
+
+Nebenbei: Es geht **nicht um „voll"**, sondern um „gleich". Beim Verbrenner sagt
+man volltanken, weil das der einzige Füllstand ist, den man zuverlässig
+wiedertrifft — nötig ist aber nur derselbe Stand am Anfang und am Ende. Beim
+E-Auto trifft das selten zu, und genau deshalb gibt es den nächsten Abschnitt.
+
+### Genau statt geschätzt: der Ladestand
+
+Trägst du zu einer Ladung den **Ladestand in Prozent nach dem Laden** ein und
+hinterlegst unter *Einstellungen* die **nutzbare Akkukapazität**, wird aus der
+Schätzung eine Messung:
+
+```
+verbrauchte Energie = geladene Energie + (Ladestand vorher − nachher) × Kapazität
+```
+
+Das Feld ist optional; leer bleibt es bei der bisherigen Rechnung. Und es genügt,
+es **selten** auszufüllen: Über eine Kette von Ladungen kürzen sich die
+Zwischenwerte weg, für eine Spanne zählen nur der Ladestand ihrer ersten und
+ihrer letzten Ladung. Wer nur zweimal im Jahr hinsieht, bekommt für das Jahr
+trotzdem den exakten Wert — nur die einzelnen Perioden dazwischen bleiben
+geschätzt.
+
+Beispiel, gegengerechnet an einem simulierten Auto mit 18,50 kWh/100 km und
+völlig unregelmäßigen Teilladungen zwischen 8 und 50 kWh:
+
+| | Ergebnis |
+|---|---|
+| ohne Ladestand | 11,32 kWh/100 km |
+| mit erstem und letztem Prozentwert | **18,50 kWh/100 km** (exakt) |
+
+Ausgeglichen wird nur die **Energie**, nicht das Geld: Bezahlt wurde, was bezahlt
+wurde. Wer am Ende wenig nachlädt, hat für die gefahrene Strecke scheinbar wenig
+bezahlt — auf die Kostenseite schlägt der Ladestand also weiterhin nur über die
+Zeit durch. Bei Monats- und Jahressummen fällt das kaum ins Gewicht.
+
+Noch eine Einordnung: Der Verbrauch dieser Rechnung ist der **ab Steckdose**,
+inklusive Ladeverlusten. Er liegt naturgemäß rund 10 % über dem, was der
+Bordcomputer anzeigt — das ist kein Fehler, sondern genau das, wofür du bezahlst.
 
 Der Benzinvergleich nimmt dieselbe Strecke:
 
@@ -113,6 +178,10 @@ Die Tabelle **Verlauf** zeigt daneben die tatsächlichen Kalendermonate und
 -jahre. Eine Ladung zählt dabei in den Monat ihres Datums; sie wird nicht
 anteilig über den Monatswechsel verteilt.
 
+**Was im Vergleich steckt:** alle Ladungen ab der zweiten. Die Übersicht schreibt
+dazu, wie viele das sind und was die erste gekostet hat. In *Insgesamt geladen*
+steht dagegen jede Ladung — das ist das Geld, das tatsächlich weg ist.
+
 **Was gemeldet statt still verrechnet wird:** ein Kilometerstand, der unter dem
 vorherigen liegt (Tippfehler — die Periode bleibt draußen), und eine Ladung ohne
 gefahrene Kilometer (die Energie zählt, ein Verbrauch entsteht daraus nicht).
@@ -126,6 +195,7 @@ zählen alle Ladungen, auch die erste.
 | Benzinpreis | 1,75 €/l | die Gegenüberstellung |
 | Verbrauch Benziner | 7,2 l/100 km | die Gegenüberstellung |
 | Haustarif | 34 ct/kWh | füllt das Preisfeld vor, wenn *Zuhause* gewählt ist |
+| Nutzbare Akkukapazität | 0 (= unbekannt) | nur nötig, wenn du den Ladestand mitschreibst |
 
 Alle drei sind in der Oberfläche unter **Einstellungen** änderbar und stehen in
 der Datendatei. Die Gegenüberstellung rechnet immer mit dem *aktuell*
@@ -145,6 +215,7 @@ oder wo `KOSTEN_DATEI` hinzeigt.
     "benzinpreis": 1.75,
     "benzinverbrauch": 7.2,
     "strompreis": 34.0,
+    "kapazitaet": 0,
     "fahrzeug": "Mein E-Auto"
   },
   "ladungen": [
@@ -155,6 +226,7 @@ oder wo `KOSTEN_DATEI` hinzeigt.
       "kwh": 38.4,
       "kosten": 11.9,
       "tarif": 0.31,
+      "soc": 80,
       "ort": "zuhause",
       "notiz": "",
       "angelegt": "2026-05-02T18:20:11+00:00"
@@ -164,7 +236,8 @@ oder wo `KOSTEN_DATEI` hinzeigt.
 ```
 
 `kosten` ist immer der Gesamtbetrag in Euro, `tarif` der Preis in **Euro** je kWh
-(oder `null`, wenn als Summe eingetragen). Sichern heißt: diese Datei kopieren.
+(oder `null`, wenn als Summe eingetragen), `soc` der Ladestand in Prozent nach dem
+Laden (oder `null`). Sichern heißt: diese Datei kopieren.
 
 ```bash
 docker compose cp kostenberechnung:/daten/kosten.json ./sicherung.json
@@ -203,14 +276,15 @@ Für ein Skript, das später einmal automatisch einträgt:
 | Weg | Zweck |
 |---|---|
 | `GET /api/daten` | Ladungen, Einstellungen und die komplette Auswertung |
-| `POST /api/ladungen` | `{"datum","km","kwh","notiz","ort"}` plus **entweder** `kosten` (€) **oder** `ct_kwh` |
+| `POST /api/ladungen` | `{"datum","km","kwh","notiz","ort","soc"}` plus **entweder** `kosten` (€) **oder** `ct_kwh` |
 | `PUT /api/ladungen/<id>` | dasselbe, ändert einen Eintrag |
 | `DELETE /api/ladungen/<id>` | löscht einen Eintrag |
-| `PUT /api/einstellungen` | `{"benzinpreis","benzinverbrauch","strompreis","fahrzeug"}` |
+| `PUT /api/einstellungen` | `{"benzinpreis","benzinverbrauch","strompreis","kapazitaet","fahrzeug"}` |
 | `GET /api/export.csv` | alle Einträge als CSV |
 | `GET /gesundheit` | für den Healthcheck |
 
-`ort` ist `zuhause` (Standard) oder `auswaerts`. Wird `ct_kwh` mitgeschickt, ergibt
+`ort` ist `zuhause` (Standard) oder `auswaerts`, `soc` der Ladestand in Prozent
+(0–100, weglassbar). Wird `ct_kwh` mitgeschickt, ergibt
 sich `kosten` daraus; sonst gilt der übergebene Betrag.
 
 ```bash
@@ -240,7 +314,7 @@ von außen erreichbar sein, dann hinter einen Reverse-Proxy mit Authentifizierun
 python3 -m unittest discover -s tests -v
 ```
 
-47 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
+63 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
 Datenhaltung samt Handarbeit an der Datei und kaputtem JSON, und die
 Weboberfläche von außen — alles gegen ein Temporärverzeichnis.
 

@@ -75,6 +75,13 @@ main { padding-bottom: 3rem; }
 
 .unterzeile { margin: 0 0 1rem; color: var(--leise); font-size: .9rem; }
 .hinweis { margin: .75rem 0 0; color: var(--leise); font-size: .85rem; }
+.merksatz {
+  margin: 1rem 0 0; padding: .7rem .8rem;
+  background: var(--grund); border: 1px solid var(--rand);
+  border-left: 3px solid var(--akzent); border-radius: 0 10px 10px 0;
+  line-height: 1.45;
+}
+.merksatz strong { color: var(--text); }
 
 /* ------------------------------------------------------------- Formulare */
 
@@ -226,6 +233,7 @@ h3.abstand { margin-top: 1.4rem; }
 .tabelle tbody th { text-align: left; font-weight: 600; color: var(--leise); }
 .tabelle td { font-variant-numeric: tabular-nums; }
 .tabelle tbody tr:last-child td, .tabelle tbody tr:last-child th { border-bottom: 0; }
+.tabelle .klein { color: var(--leise); font-weight: 400; font-size: .8em; }
 .tabelle .gut { color: var(--gut); font-weight: 600; }
 .tabelle .schlecht { color: var(--warn); font-weight: 600; }
 .tabelle .werkzeuge { display: flex; gap: .3rem; justify-content: flex-end; }
