@@ -82,9 +82,17 @@ zwei Einträge wäre der falsche Weg: zwei Ladungen beim selben Kilometerstand
 ergeben eine Strecke von null, und der Verbrauch fiele zu niedrig aus.
 
 Die Übersicht bekommt dafür eine eigene Zeile: geladene Energie, davon aus der
-Anlage, davon aus dem Netz, und der **effektive** Preis der Überschussladerei.
-Der Ø-Preis unter *Zuhause* bleibt damit der echte Arbeitspreis statt eines
-Mischwerts.
+Anlage, davon aus dem Netz — und **zwei** Preise, die man auseinanderhalten muss:
+
+| Zeile | Rechnung | was sie bedeutet |
+|---|---|---|
+| Ø je Netz-kWh | Kosten ÷ Netzanteil | der Arbeitspreis. So teuer war jede kWh, die wirklich gekauft wurde. |
+| Ø je geladener kWh | Kosten ÷ geladene Energie | der Schnitt über alles, Gratis-Sonne eingerechnet. Immer kleiner — und kein Preis, zu dem irgendwer etwas gekauft hat. |
+
+28 kWh geladen, davon 24 aus dem Netz zu 29 ct: gekauft wurde zu **29,0 ct**,
+geladen im Schnitt zu 24,9 ct. Beide Zahlen sind richtig, sie beantworten nur
+verschiedene Fragen. Der Ø-Preis unter *Zuhause* bleibt davon unberührt der echte
+Arbeitspreis statt eines Mischwerts.
 
 Zwei Dinge dabei, die man wissen muss:
 

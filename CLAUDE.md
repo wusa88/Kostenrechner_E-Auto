@@ -103,6 +103,13 @@ bezahlt.
 - steht die selbst geladene Energie als Zahl da — genau die, die die
   Amortisationsrechnung der Anlage als Eigenverbrauch braucht.
 
+Die PV-Zeile trägt **zwei** Preise, und die dürfen nie zu einem verschmelzen:
+`netz_preis_kwh` (Kosten ÷ Netzanteil) ist der Arbeitspreis, zu dem tatsächlich
+gekauft wurde; `preis_kwh` (Kosten ÷ geladene Energie) ist der Schnitt über alles,
+Gratis-Sonne eingerechnet. Nur der erste ist ein Preis, zu dem jemand etwas
+gekauft hat — genau daran hat sich der Nutzer gestoßen, als die Oberfläche nur den
+zweiten unter „Ø Preis" zeigte.
+
 Die Energie zählt ganz normal in Strecke, Verbrauch und Vergleich; nur das Geld
 fehlt. Die Gegenüberstellung fällt dadurch zugunsten des Autos aus, und die
 Oberfläche sagt das unter „Wo geladen wurde" auch hin: der Wert dieser

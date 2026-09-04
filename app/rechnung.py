@@ -213,8 +213,14 @@ def nach_orten(ladungen: list[Ladung]) -> list[dict]:
 
     Bei der PV-Zeile steht zusaetzlich, wieviel davon doch aus dem Netz kam
     (`netz_kwh`, aus der Ladung selbst) und wieviel aus der eigenen Anlage
-    (`pv_kwh`). Nur der Netzanteil ist bezahlt worden; `preis_kwh` ist deshalb
-    der *effektive* Preis der Ueberschussladerei, nicht der Arbeitspreis.
+    (`pv_kwh`). Nur der Netzanteil ist bezahlt worden, und darum gibt es dort
+    zwei Preise, die man nicht verwechseln darf:
+
+    - `netz_preis_kwh` = Kosten / Netzanteil: was jede *gekaufte* kWh gekostet
+      hat. Das ist der Arbeitspreis, den man auch bezahlt hat.
+    - `preis_kwh` = Kosten / geladene Energie: was eine geladene kWh im Schnitt
+      gekostet hat, die Gratis-Sonne eingerechnet. Immer kleiner, und kein Preis,
+      zu dem irgendjemand irgendetwas gekauft haette.
 
     Die PV-Zeile erscheint erst, wenn es eine PV-Ladung gibt — wer keine Anlage
     hat, soll auch keine leere Zeile sehen.
@@ -238,6 +244,7 @@ def nach_orten(ladungen: list[Ladung]) -> list[dict]:
             "netz_kwh": netz,
             "pv_kwh": None if netz is None else kwh - netz,
             "preis_kwh": _teilen(kosten, kwh),
+            "netz_preis_kwh": None if netz is None else _teilen(kosten, netz),
             "anteil_kwh": _teilen(kwh * 100.0, sum(l.kwh for l in ladungen)),
         })
     return reihen

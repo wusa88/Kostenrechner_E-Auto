@@ -203,8 +203,10 @@
             ` <small>(${f0.format(o.anteil_kwh)} %)</small>` : ""}</dd></div>
           ${o.ort === "pv" ? `
           <div><dt>aus der Anlage</dt><dd>${kwh(o.pv_kwh)}</dd></div>
-          <div><dt>doch aus dem Netz</dt><dd>${kwh(o.netz_kwh)}</dd></div>` : ""}
-          <div><dt>Ø Preis</dt><dd>${ct(o.preis_kwh)}</dd></div>
+          <div><dt>doch aus dem Netz</dt><dd>${kwh(o.netz_kwh)}</dd></div>
+          <div><dt>Ø je Netz-kWh</dt><dd>${ct(o.netz_preis_kwh)}</dd></div>
+          <div><dt>Ø je geladener kWh</dt><dd>${ct(o.preis_kwh)}</dd></div>`
+          : `<div><dt>Ø Preis</dt><dd>${ct(o.preis_kwh)}</dd></div>`}
           <div class="hervor"><dt>Bezahlt</dt><dd>${euro(o.kosten)}</dd></div>
         </dl>
       </div>`).join("");
@@ -347,7 +349,9 @@
         <td>${f0.format(l.km)}</td>
         <td>${p && p.gueltig ? f0.format(p.strecke) + " km" : leer}</td>
         <td>${f1.format(l.kwh)}${l.soc === null || l.soc === undefined ? ""
-          : ` <span class="klein">→ ${f0.format(l.soc)} %</span>`}</td>
+          : ` <span class="klein">→ ${f0.format(l.soc)} %</span>`}${
+          da(l.netz_kwh) && l.netz_kwh > 0
+            ? `<br><span class="klein">davon ${f1.format(l.netz_kwh)} Netz</span>` : ""}</td>
         <td>${p && p.gueltig ? zahl1(p.verbrauch) : leer}</td>
         <td>${da(preis) ? f1.format(preis * 100) : leer}</td>
         <td>${euro(l.kosten)}</td>
