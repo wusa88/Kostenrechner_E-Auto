@@ -11,6 +11,7 @@
   --akzent-weich: #d8efec;
   --strom: #0f766e;
   --benzin: #b45309;
+  --sonne: #a16207;
   --gut: #15803d;
   --warn: #b45309;
   --schatten: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .07);
@@ -28,6 +29,7 @@
     --akzent-weich: #14343a;
     --strom: #2dd4bf;
     --benzin: #f59e0b;
+    --sonne: #facc15;
     --gut: #4ade80;
     --warn: #fbbf24;
     --schatten: none;
@@ -152,7 +154,7 @@ button.leise:hover, .knopf.leise:hover { border-color: var(--akzent); color: var
 
 .schalter { display: inline-flex; border: 1px solid var(--rand); border-radius: 9px; overflow: hidden; }
 .schalter.breitschalter { display: flex; margin-top: 1rem; }
-.schalter.breitschalter button { flex: 1; }
+.schalter.breitschalter button { flex: 1; padding-left: .4rem; padding-right: .4rem; }
 .schalter.klein button { padding: .2rem .55rem; min-height: 28px; font-size: .78rem; }
 .schalter button {
   border: 0; border-radius: 0; background: transparent; color: var(--leise);
@@ -206,12 +208,14 @@ h3.abstand { margin-top: 1.4rem; }
 .ortname { display: flex; align-items: center; gap: .45rem; }
 .ortname .punkt.zuhause { background: var(--akzent); }
 .ortname .punkt.auswaerts { background: var(--benzin); }
+.ortname .punkt.pv { background: var(--sonne); }
 .marke {
   display: inline-block; padding: .1rem .5rem; border-radius: 999px;
   font-size: .75rem; font-weight: 600; border: 1px solid var(--rand); color: var(--leise);
 }
 .marke.zuhause { color: var(--akzent); border-color: var(--akzent); }
 .marke.auswaerts { color: var(--benzin); border-color: var(--benzin); }
+.marke.pv { color: var(--sonne); border-color: var(--sonne); }
 .block { background: var(--grund); border: 1px solid var(--rand); border-radius: 11px; padding: .9rem; }
 .block dl { margin: 0; }
 .block dl > div {

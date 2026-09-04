@@ -109,7 +109,8 @@ def datum_aus(wert, feld: str = "Datum") -> date:
 def ort_aus(wert) -> str:
     ort = str(wert or "zuhause").strip().lower()
     if ort not in ORTE:
-        raise Eingabefehler(f"Ort: „{wert}“ kenne ich nicht (zuhause oder auswaerts).")
+        raise Eingabefehler(
+            f"Ort: „{wert}“ kenne ich nicht (zuhause, auswaerts oder pv).")
     return ort
 
 
@@ -120,17 +121,33 @@ def ladung_aus_daten(daten: dict) -> dict:
     Quittung. Beides ist zulaessig; gespeichert wird immer die Summe, und bei
     Eingabe je kWh zusaetzlich der Tarif, damit die Eingabe unveraendert
     zurueckkommt, wenn der Eintrag spaeter geaendert wird.
+
+    Beim Ueberschussladen (ort "pv") gilt der Arbeitspreis nur fuer den Teil,
+    der doch aus dem Netz kam — zieht eine Wolke auf, bevor die Regelung
+    nachkommt. Ohne Angabe ist dieser Teil 0 und die Ladung hat nichts gekostet.
     """
     kwh = zahl(daten.get("kwh"), "Geladene Energie", minimum=0.0)
+    ort = ort_aus(daten.get("ort"))
+
+    netz = daten.get("netz_kwh")
+    hat_netz = ort == "pv" and netz is not None and str(netz).strip() != ""
+    netz_kwh = zahl(netz, "Netzbezug", minimum=0.0) if hat_netz else None
+    if netz_kwh is not None and netz_kwh > kwh:
+        raise Eingabefehler(
+            f"Netzbezug: {netz_kwh:g} kWh sind mehr, als überhaupt geladen wurde "
+            f"({kwh:g} kWh).")
+
     ct = daten.get("ct_kwh")
     hat_ct = ct is not None and str(ct).strip() != ""
 
     if hat_ct:
         tarif = zahl(ct, "Preis je kWh", minimum=0.0) / 100.0
-        kosten = kwh * tarif
+        # Bezahlt wird nur, was aus dem Netz kam — bei PV also der Netzanteil.
+        kosten = ((netz_kwh or 0.0) if ort == "pv" else kwh) * tarif
     else:
         tarif = None
-        kosten = zahl(daten.get("kosten"), "Kosten der Ladung", minimum=0.0)
+        kosten = zahl(daten.get("kosten"), "Kosten der Ladung", minimum=0.0,
+                      pflicht=ort != "pv")
 
     soc = daten.get("soc")
     hat_soc = soc is not None and str(soc).strip() != ""
@@ -139,9 +156,10 @@ def ladung_aus_daten(daten: dict) -> dict:
         "datum": datum_aus(daten.get("datum")),
         "km": zahl(daten.get("km"), "Kilometerstand"),
         "kwh": kwh,
+        "netz_kwh": netz_kwh,
         "kosten": kosten,
         "notiz": str(daten.get("notiz") or "").strip()[:200],
-        "ort": ort_aus(daten.get("ort")),
+        "ort": ort,
         "tarif": tarif,
         "soc": zahl(soc, "Ladestand", minimum=0.0, hoechstens=100.0) if hat_soc else None,
     }
@@ -167,6 +185,7 @@ def zustand() -> dict:
                 "datum": l.datum.isoformat(),
                 "km": l.km,
                 "kwh": l.kwh,
+                "netz_kwh": l.netz_kwh,
                 "kosten": l.kosten,
                 "notiz": l.notiz,
                 "ort": l.ort,
@@ -183,13 +202,14 @@ def csv_export() -> bytes:
     puffer = io.StringIO()
     schreiber = csv.writer(puffer, delimiter=";")
     schreiber.writerow(
-        ["Datum", "Kilometerstand", "kWh", "Kosten EUR", "ct/kWh", "Ladestand %",
-         "Ort", "Notiz"])
+        ["Datum", "Kilometerstand", "kWh", "davon Netz kWh", "Kosten EUR", "ct/kWh",
+         "Ladestand %", "Ort", "Notiz"])
     for l in speicher.ladungen():
         schreiber.writerow([
             l.datum.isoformat(),
             f"{l.km:.1f}".replace(".", ","),
             f"{l.kwh:.3f}".replace(".", ","),
+            "" if l.netz_kwh is None else f"{l.netz_kwh:.3f}".replace(".", ","),
             f"{l.kosten:.2f}".replace(".", ","),
             f"{l.kosten / l.kwh * 100:.2f}".replace(".", ",") if l.kwh else "",
             "" if l.soc is None else f"{l.soc:.0f}",

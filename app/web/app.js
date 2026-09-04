@@ -201,10 +201,26 @@
           <div><dt>Ladungen</dt><dd>${f0.format(o.ladungen)}</dd></div>
           <div><dt>Energie</dt><dd>${kwh(o.kwh)}${da(o.anteil_kwh) ?
             ` <small>(${f0.format(o.anteil_kwh)} %)</small>` : ""}</dd></div>
+          ${o.ort === "pv" ? `
+          <div><dt>aus der Anlage</dt><dd>${kwh(o.pv_kwh)}</dd></div>
+          <div><dt>doch aus dem Netz</dt><dd>${kwh(o.netz_kwh)}</dd></div>` : ""}
           <div><dt>Ø Preis</dt><dd>${ct(o.preis_kwh)}</dd></div>
           <div class="hervor"><dt>Bezahlt</dt><dd>${euro(o.kosten)}</dd></div>
         </dl>
       </div>`).join("");
+    pvHinweis(a.orte.find((o) => o.ort === "pv"));
+  }
+
+  /* Warum die Ersparnis mit PV so gut aussieht — und wo die Zahl hingehört. */
+  function pvHinweis(pv) {
+    const feld = $("pv_hinweis");
+    feld.hidden = !pv;
+    if (!pv) return;
+    feld.innerHTML =
+      `<strong>PV-Strom steht mit 0 €</strong>, weil dafür nichts bezahlt wurde — nur der ` +
+      `Netzanteil kostet etwas. Die Gegenüberstellung unten fällt dadurch zugunsten des ` +
+      `Autos aus. Was die ${kwh(pv.pv_kwh)} aus der eigenen Anlage wert sind, gehört in die ` +
+      `Amortisation der Anlage; hier stünde dieselbe Kilowattstunde sonst ein zweites Mal.`;
   }
 
   function vergleich(a, e) {
@@ -323,7 +339,7 @@
     koerper.innerHTML = ladungen.map((l) => {
       const p = nach.get(l.id);
       const preis = l.kwh > 0 ? l.kosten / l.kwh : null;
-      const name = l.ort === "auswaerts" ? "auswärts" : "zuhause";
+      const name = { auswaerts: "auswärts", pv: "PV" }[l.ort] || "zuhause";
       return `
       <tr>
         <td>${datumDe(l.datum)}${l.notiz ? `<br><small class="hinweis">${sicher(l.notiz)}</small>` : ""}</td>
@@ -354,18 +370,26 @@
     ort = neu;
     document.querySelectorAll("#ortwahl button")
       .forEach((k) => k.classList.toggle("aktiv", k.dataset.ort === neu));
+
+    // Der Netzanteil ist nur beim Überschussladen eine Frage. Und dort darf das
+    // Preisfeld leer bleiben: eine reine PV-Ladung hat keinen Preis.
+    $("netzfeld").hidden = neu !== "pv";
+    $("f_preis").required = neu !== "pv";
+    if (neu !== "pv") $("f_netz").value = "";
     if (!vomBenutzer) return;
 
-    // Zuhause kennt man den Arbeitspreis, unterwegs steht die Summe auf der Quittung.
-    preisartSetzen(neu === "zuhause" ? "tarif" : "summe", true);
+    // Zuhause kennt man den Arbeitspreis, unterwegs steht die Summe auf der
+    // Quittung; beim Überschussladen zahlt der Arbeitspreis den Netzanteil.
+    preisartSetzen(neu === "auswaerts" ? "summe" : "tarif", true);
     if (preisIstVorschlag || !$("f_preis").value.trim()) vorschlagSetzen();
     preisHinweis();
   }
 
-  /* Zuhause und je kWh: der Haustarif steht schon da. Sonst bleibt das Feld leer. */
+  /* Zuhause und je kWh: der Haustarif steht schon da. Sonst bleibt das Feld leer.
+     Bei PV gilt er ebenso — er bepreist dort den Netzanteil. */
   function vorschlagSetzen() {
     const tarif = haustarif();
-    if (ort === "zuhause" && preisart === "tarif" && da(tarif)) {
+    if (ort !== "auswaerts" && preisart === "tarif" && da(tarif)) {
       $("f_preis").value = komma(tarif, 1);
       preisIstVorschlag = true;
     } else {
@@ -409,6 +433,19 @@
     const energie = gelesen($("f_kwh").value);
     const feld = $("preis_hinweis");
 
+    // Beim Überschussladen bepreist der Tarif nur, was aus dem Netz kam.
+    if (ort === "pv" && preisart === "tarif") {
+      const netz = gelesen($("f_netz").value);
+      const teil = da(netz) ? netz : 0;
+      feld.textContent = !da(wert)
+        ? "Der Arbeitspreis — bezahlt wird damit nur, was aus dem Netz kam."
+        : teil <= 0
+          ? "Nichts aus dem Netz: diese Ladung hat 0,00 € gekostet."
+          : `${komma(teil, 1)} kWh aus dem Netz × ${komma(wert, 1)} ct = `
+            + `${euro((wert / 100) * teil)}`;
+      return;
+    }
+
     if (!da(wert) || !da(energie) || energie <= 0) {
       feld.textContent = preisart === "tarif"
         ? "Der Preis je kWh — die Gesamtkosten rechnet der Rechner selbst aus."
@@ -427,6 +464,8 @@
     datumSetzen(l ? l.datum : (zustand ? zustand.heute : ""));
     $("f_km").value = l ? komma(l.km, 0) : "";
     $("f_kwh").value = l ? komma(l.kwh, 2) : "";
+    $("f_netz").value = l && l.netz_kwh !== null && l.netz_kwh !== undefined
+      ? komma(l.netz_kwh, 2) : "";
     $("f_soc").value = l && l.soc !== null && l.soc !== undefined ? komma(l.soc, 0) : "";
     $("f_notiz").value = l ? l.notiz : "";
     $("f_speichern").textContent = l ? "Änderung speichern" : "Eintragen";
@@ -463,6 +502,7 @@
       notiz: $("f_notiz").value,
       ort: ort,
     };
+    if (ort === "pv") daten.netz_kwh = $("f_netz").value;
     if (preisart === "tarif") daten.ct_kwh = $("f_preis").value;
     else daten.kosten = $("f_preis").value;
     return JSON.stringify(daten);
@@ -514,6 +554,7 @@
       if ($("f_kalender").value) datumSetzen($("f_kalender").value);
     });
     $("f_kwh").addEventListener("input", preisHinweis);
+    $("f_netz").addEventListener("input", preisHinweis);
     $("f_preis").addEventListener("input", () => {
       preisIstVorschlag = false;
       preisHinweis();

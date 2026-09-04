@@ -35,9 +35,9 @@ MONATSNAMEN = [
 ]
 
 
-ORTE = ("zuhause", "auswaerts")
+ORTE = ("zuhause", "auswaerts", "pv")
 
-ORTSNAMEN = {"zuhause": "zuhause", "auswaerts": "auswärts"}
+ORTSNAMEN = {"zuhause": "zuhause", "auswaerts": "auswärts", "pv": "PV-Überschuss"}
 
 
 @dataclass
@@ -48,9 +48,10 @@ class Ladung:
     kwh: float
     kosten: float          # was die Ladung insgesamt gekostet hat, in Euro
     notiz: str = ""
-    ort: str = "zuhause"   # zuhause | auswaerts
+    ort: str = "zuhause"   # zuhause | auswaerts | pv (Ueberschuss der eigenen Anlage)
     tarif: float | None = None   # EUR/kWh, falls je kWh statt als Summe eingetragen
     soc: float | None = None     # Ladestand in Prozent NACH dieser Ladung
+    netz_kwh: float | None = None  # bei PV-Ladung: der Teil, der doch aus dem Netz kam
 
 
 def datum_lesen(wert) -> date:
@@ -205,22 +206,37 @@ def _zeitraeume(gueltige: list[dict], schluessel, beschriftung,
 
 
 def nach_orten(ladungen: list[Ladung]) -> list[dict]:
-    """Trennt zuhause und auswaerts — zwei ganz verschiedene Strompreise.
+    """Trennt zuhause, auswaerts und PV-Ueberschuss — drei ganz verschiedene Preise.
 
     Gerechnet ueber alle Ladungen, auch die erste: hier geht es um bezahltes
     Geld, nicht um Verbrauch.
+
+    Bei der PV-Zeile steht zusaetzlich, wieviel davon doch aus dem Netz kam
+    (`netz_kwh`, aus der Ladung selbst) und wieviel aus der eigenen Anlage
+    (`pv_kwh`). Nur der Netzanteil ist bezahlt worden; `preis_kwh` ist deshalb
+    der *effektive* Preis der Ueberschussladerei, nicht der Arbeitspreis.
+
+    Die PV-Zeile erscheint erst, wenn es eine PV-Ladung gibt — wer keine Anlage
+    hat, soll auch keine leere Zeile sehen.
     """
     reihen = []
     for ort in ORTE:
         eigene = [l for l in ladungen if l.ort == ort]
+        if ort == "pv" and not eigene:
+            continue
         kwh = sum(l.kwh for l in eigene)
         kosten = sum(l.kosten for l in eigene)
+        # Ein von Hand verdrehter Netzanteil wird gemeldet (siehe auswerten) und
+        # hier gedeckelt, damit die PV-Menge nicht negativ wird.
+        netz = sum(min(l.netz_kwh or 0.0, l.kwh) for l in eigene) if ort == "pv" else None
         reihen.append({
             "ort": ort,
             "titel": ORTSNAMEN[ort],
             "ladungen": len(eigene),
             "kwh": kwh,
             "kosten": kosten,
+            "netz_kwh": netz,
+            "pv_kwh": None if netz is None else kwh - netz,
             "preis_kwh": _teilen(kosten, kwh),
             "anteil_kwh": _teilen(kwh * 100.0, sum(l.kwh for l in ladungen)),
         })
@@ -265,6 +281,13 @@ def auswerten(ladungen: list[Ladung], benzinpreis: float, benzinverbrauch: float
     """Die vollstaendige Auswertung, fertig fuer die Oberflaeche."""
     liste, warnungen = perioden(ladungen)
     gueltige = [p for p in liste if p["gueltig"]]
+
+    for eintrag in sorted(ladungen, key=lambda l: (l.datum, l.km, l.id)):
+        if eintrag.netz_kwh is not None and eintrag.netz_kwh > eintrag.kwh + 1e-9:
+            warnungen.append(
+                f"{eintrag.datum:%d.%m.%Y}: Netzanteil {eintrag.netz_kwh:.1f} kWh ist größer "
+                f"als die geladene Energie ({eintrag.kwh:.1f} kWh) — bitte nachsehen."
+            )
 
     # Je Periode: steht der Ladestand an beiden Enden, ist ihr Verbrauch gemessen.
     for p in liste:

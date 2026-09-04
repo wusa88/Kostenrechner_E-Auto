@@ -57,7 +57,7 @@ am Handy der bequemere Weg.
 
 | Schalter | Wahl | wofür |
 |---|---|---|
-| Ladeort | *Zuhause* / *Auswärts* | Zuhause füllt den Haustarif vor. Außerdem trennt die Übersicht danach: wie viel kam aus der eigenen Steckdose, zu welchem Preis. |
+| Ladeort | *Zuhause* / *Auswärts* / *PV-Überschuss* | Zuhause füllt den Haustarif vor. Außerdem trennt die Übersicht danach: wie viel kam aus der eigenen Steckdose, zu welchem Preis. |
 | Eingabeart | *ct/kWh* / *Summe €* | Zuhause kennt man den Arbeitspreis, unterwegs steht der Betrag auf der Quittung. |
 
 Die beiden hängen nicht aneinander: Auch auswärts darf man den Preis je kWh
@@ -67,6 +67,35 @@ kann man aus dem kWh-Preis nicht mehr zurückrechnen.
 
 Der **Ladestand danach** ist optional — was er bringt, steht weiter unten unter
 *Genau statt geschätzt*.
+
+### PV-Überschuss
+
+*PV-Überschuss* ist der dritte Ladeort. Er sagt nicht, **wo** geladen wurde,
+sondern **woher** der Strom kam: aus der eigenen Anlage. Dafür wurde nichts
+bezahlt, also steht die Ladung mit 0 € da.
+
+Weil eine Wolke schneller ist als jede Regelung, erscheint bei dieser Wahl ein
+zusätzliches Feld: **Davon aus dem Netz**. Bleibt es leer, war alles Sonne. Steht
+dort eine Zahl, wird nur sie mit dem Arbeitspreis bewertet — 30 kWh geladen,
+davon 3 aus dem Netz zu 29 ct, macht 0,87 € für die ganze Ladung. Aufteilen in
+zwei Einträge wäre der falsche Weg: zwei Ladungen beim selben Kilometerstand
+ergeben eine Strecke von null, und der Verbrauch fiele zu niedrig aus.
+
+Die Übersicht bekommt dafür eine eigene Zeile: geladene Energie, davon aus der
+Anlage, davon aus dem Netz, und der **effektive** Preis der Überschussladerei.
+Der Ø-Preis unter *Zuhause* bleibt damit der echte Arbeitspreis statt eines
+Mischwerts.
+
+Zwei Dinge dabei, die man wissen muss:
+
+- Die Energie zählt ganz normal in Strecke, Verbrauch und Vergleich — nur das
+  Geld fehlt. Die Ersparnis gegenüber Benzin fällt entsprechend groß aus. Das ist
+  kassenmäßig richtig und für die Frage „was hat das Fahren gekostet" die
+  Wahrheit.
+- Für die Frage „lohnt sich die Anlage" ist es das nicht. Der Wert dieser
+  Kilowattstunden gehört in die Amortisationsrechnung der **Anlage**; würde er
+  hier noch einmal gutgeschrieben, stünde dieselbe Kilowattstunde zweimal in den
+  Büchern. Genau dafür steht die selbst geladene Menge als eigene Zahl da.
 
 Unter dem Feld steht immer live die andere Darstellung — `41,2 kWh × 34,0 ct =
 14,01 €` beziehungsweise `27,84 € ÷ 41,2 kWh = 67,6 ct/kWh`. Ein Vertipper fällt
@@ -224,6 +253,7 @@ oder wo `KOSTEN_DATEI` hinzeigt.
       "datum": "2026-05-02",
       "km": 24100,
       "kwh": 38.4,
+      "netz_kwh": null,
       "kosten": 11.9,
       "tarif": 0.31,
       "soc": 80,
@@ -237,7 +267,8 @@ oder wo `KOSTEN_DATEI` hinzeigt.
 
 `kosten` ist immer der Gesamtbetrag in Euro, `tarif` der Preis in **Euro** je kWh
 (oder `null`, wenn als Summe eingetragen), `soc` der Ladestand in Prozent nach dem
-Laden (oder `null`). Sichern heißt: diese Datei kopieren.
+Laden (oder `null`), `netz_kwh` bei `"ort": "pv"` der Anteil aus dem Netz (sonst
+`null`). Sichern heißt: diese Datei kopieren.
 
 ```bash
 docker compose cp kostenberechnung:/daten/kosten.json ./sicherung.json
@@ -276,16 +307,18 @@ Für ein Skript, das später einmal automatisch einträgt:
 | Weg | Zweck |
 |---|---|
 | `GET /api/daten` | Ladungen, Einstellungen und die komplette Auswertung |
-| `POST /api/ladungen` | `{"datum","km","kwh","notiz","ort","soc"}` plus **entweder** `kosten` (€) **oder** `ct_kwh` |
+| `POST /api/ladungen` | `{"datum","km","kwh","notiz","ort","soc","netz_kwh"}` plus **entweder** `kosten` (€) **oder** `ct_kwh` |
 | `PUT /api/ladungen/<id>` | dasselbe, ändert einen Eintrag |
 | `DELETE /api/ladungen/<id>` | löscht einen Eintrag |
 | `PUT /api/einstellungen` | `{"benzinpreis","benzinverbrauch","strompreis","kapazitaet","fahrzeug"}` |
 | `GET /api/export.csv` | alle Einträge als CSV |
 | `GET /gesundheit` | für den Healthcheck |
 
-`ort` ist `zuhause` (Standard) oder `auswaerts`, `soc` der Ladestand in Prozent
-(0–100, weglassbar). Wird `ct_kwh` mitgeschickt, ergibt
-sich `kosten` daraus; sonst gilt der übergebene Betrag.
+`ort` ist `zuhause` (Standard), `auswaerts` oder `pv`, `soc` der Ladestand in
+Prozent (0–100, weglassbar). Wird `ct_kwh` mitgeschickt, ergibt sich `kosten`
+daraus; sonst gilt der übergebene Betrag. `netz_kwh` gilt nur bei `pv` und
+begrenzt, worauf `ct_kwh` angewendet wird — ohne die Angabe kostet die Ladung
+nichts.
 
 ```bash
 # zuhause, Preis je kWh
@@ -297,6 +330,11 @@ curl -X POST http://127.0.0.1:8385/api/ladungen \
 curl -X POST http://127.0.0.1:8385/api/ladungen \
   -H 'Content-Type: application/json' \
   -d '{"datum":"2026-09-03","km":26240,"kwh":72.4,"kosten":43.90,"ort":"auswaerts"}'
+
+# Überschuss geladen, 3,4 kWh kamen bei Wolken doch aus dem Netz
+curl -X POST http://127.0.0.1:8385/api/ladungen \
+  -H 'Content-Type: application/json' \
+  -d '{"datum":"2026-09-03","km":26240,"kwh":30,"netz_kwh":3.4,"ct_kwh":29,"ort":"pv"}'
 ```
 
 Jede schreibende Antwort enthält den vollständigen neuen Zustand — die Oberfläche
@@ -314,7 +352,7 @@ von außen erreichbar sein, dann hinter einen Reverse-Proxy mit Authentifizierun
 python3 -m unittest discover -s tests -v
 ```
 
-63 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
+77 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
 Datenhaltung samt Handarbeit an der Datei und kaputtem JSON, und die
 Weboberfläche von außen — alles gegen ein Temporärverzeichnis.
 
@@ -329,6 +367,7 @@ Weboberfläche von außen — alles gegen ein Temporärverzeichnis.
 | `tests/` | Rechenkern, Datenhaltung und Oberfläche |
 | `Dockerfile`, `docker-compose.yml` | der Container |
 | `.github/workflows/` | Tests bei jedem Push, Abbild nach ghcr.io |
+| `CLAUDE.md` | Aufbau und Konventionen für Claude Code |
 
 ## Lizenz
 

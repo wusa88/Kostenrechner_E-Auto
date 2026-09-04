@@ -29,8 +29,9 @@
       <input type="hidden" id="f_id" value="">
 
       <div class="schalter breitschalter" id="ortwahl">
-        <button type="button" data-ort="zuhause" class="aktiv">Zuhause geladen</button>
-        <button type="button" data-ort="auswaerts">Auswärts geladen</button>
+        <button type="button" data-ort="zuhause" class="aktiv">Zuhause</button>
+        <button type="button" data-ort="auswaerts">Auswärts</button>
+        <button type="button" data-ort="pv">PV-Überschuss</button>
       </div>
 
       <div class="felder">
@@ -54,6 +55,9 @@
         </label>
         <label>Geladene Energie <span class="einheit">kWh</span>
           <input type="text" inputmode="decimal" id="f_kwh" placeholder="z. B. 41,2" required>
+        </label>
+        <label id="netzfeld" hidden>Davon aus dem Netz <span class="einheit">kWh · optional</span>
+          <input type="text" inputmode="decimal" id="f_netz" placeholder="0 = alles aus der PV">
         </label>
         <div class="feld">
           <div class="feldkopf">
@@ -109,6 +113,7 @@
 
     <h3 class="abstand">Wo geladen wurde</h3>
     <div class="zwei" id="orte"></div>
+    <p class="hinweis" id="pv_hinweis" hidden></p>
   </section>
 
   <!-- --------------------------------------------------------- Vergleich -->
