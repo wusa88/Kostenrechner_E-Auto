@@ -461,6 +461,65 @@
       : `${euro(wert)} ÷ ${komma(energie, 1)} kWh = ${komma((wert / energie) * 100, 1)} ct/kWh`;
   }
 
+  // ------------------------------------------- Überschuss ausrechnen
+
+  const RECHNERFELDER = ["bezug_von", "bezug_bis", "einspeisung_von", "einspeisung_bis",
+                         "erzeugung_von", "erzeugung_bis", "ladung_von", "ladung_bis"];
+
+  function rechnerEingabe() {
+    const daten = {};
+    RECHNERFELDER.forEach((name) => { daten[name] = $("r_" + name).value; });
+    return JSON.stringify(daten);
+  }
+
+  function rechnerZeigen(r) {
+    $("rechner_ergebnis").hidden = false;
+
+    $("r_ladung").textContent = kwh(r.ladung);
+    $("r_netz").textContent = kwh(r.netz_kwh);
+    $("r_pv").textContent = kwh(r.pv_kwh) + (da(r.pv_anteil)
+      ? ` (${f0.format(r.pv_anteil)} %)` : "");
+    $("r_kosten").textContent = euro(r.kosten);
+
+    $("r_erzeugt").textContent = kwh(r.erzeugung);
+    $("r_eingespeist").textContent = kwh(r.einspeisung);
+    $("r_bezogen").textContent = kwh(r.bezug);
+    $("r_haus").textContent = kwh(r.hausverbrauch);
+    $("r_rest").textContent = kwh(r.restlast);
+
+    $("r_fazit").innerHTML =
+      `Trag oben <strong>${kwh(r.ladung)}</strong> ein, davon ` +
+      `<strong>${kwh(r.netz_kwh)}</strong> aus dem Netz — das macht ` +
+      `<strong>${euro(r.kosten)}</strong> bei ${ct(r.tarif)}/kWh.`;
+
+    // Wem der Netzbezug gehoert, sagt kein Zaehler. Also die Spanne dazu.
+    const feld = $("r_spanne");
+    if (!r.spanne) {
+      feld.innerHTML =
+        `<strong>Ohne PV-Erzeugung keine Spanne.</strong> Der Wert unterstellt, dass ` +
+        `jede bezogene Kilowattstunde ins Auto ging. Trägst du die Erzeugung mit ein, ` +
+        `rechnet der Rechner aus, wie viel davon das Haus gebraucht hat — und wie ` +
+        `unsicher die Aufteilung noch ist.`;
+    } else if (r.spanne.hoch - r.spanne.tief < 0.05) {
+      feld.innerHTML =
+        `<strong>Eindeutig.</strong> Haus und Auto lassen sich hier nicht anders ` +
+        `aufteilen: es bleibt bei ${kwh(r.netz_kwh)} aus dem Netz.`;
+    } else {
+      feld.innerHTML =
+        `<strong>Die Aufteilung ist eine Annahme.</strong> Während einer Wolke ziehen ` +
+        `Haus und Auto gleichzeitig aus dem Netz, und kein Zähler sagt, wem welche ` +
+        `Kilowattstunde gehörte. Je nach Lesart sind es zwischen ` +
+        `<strong>${kwh(r.spanne.tief)}</strong> (das Haus zuerst am Netz) und ` +
+        `<strong>${kwh(r.spanne.hoch)}</strong> (das Auto zuerst); anteilig gerechnet ` +
+        `${kwh(r.spanne.anteilig)}. Vorgeschlagen ist der obere Wert — er passt zur ` +
+        `Regelung, die aus der PV zuerst das Haus bedient, und rechnet im Zweifel zu ` +
+        `Lasten des Autos.`;
+    }
+
+    $("r_warnungen").innerHTML = (r.warnungen || [])
+      .map((w) => `<p class="warnung">${sicher(w)}</p>`).join("");
+  }
+
   // ------------------------------------------------------------- Bedienung
 
   function formularFuellen(l) {
@@ -540,6 +599,22 @@
     });
 
     $("f_abbrechen").addEventListener("click", () => formularFuellen(null));
+
+    $("rechner_formular").addEventListener("submit", async (ereignis) => {
+      ereignis.preventDefault();
+      try {
+        rechnerZeigen(await ruf("/api/ueberschuss", { method: "POST", body: rechnerEingabe() }));
+      } catch (fehler) {
+        $("rechner_ergebnis").hidden = true;
+        melden(fehler.message, "fehler");
+      }
+    });
+
+    $("r_leeren").addEventListener("click", () => {
+      RECHNERFELDER.forEach((name) => { $("r_" + name).value = ""; });
+      $("rechner_ergebnis").hidden = true;
+      $("r_bezug_von").focus();
+    });
 
     // Beim Verlassen sauber ausschreiben: aus 3.9.26 wird 03.09.2026.
     $("f_datum").addEventListener("blur", () => {

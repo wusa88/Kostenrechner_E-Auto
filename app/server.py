@@ -23,7 +23,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import __version__, speicher
-from .rechnung import ORTE, ORTSNAMEN, auswerten, datum_lesen
+from .rechnung import ORTE, ORTSNAMEN, auswerten, datum_lesen, ueberschuss
 
 WEB = Path(__file__).resolve().parent / "web"
 
@@ -163,6 +163,37 @@ def ladung_aus_daten(daten: dict) -> dict:
         "tarif": tarif,
         "soc": zahl(soc, "Ladestand", minimum=0.0, hoechstens=100.0) if hat_soc else None,
     }
+
+
+def _differenz(daten: dict, name: str, feld: str, pflicht: bool = True) -> float | None:
+    """Aus Start- und Endstand eines Zaehlers die Menge im Fenster.
+
+    Ein leerer Startstand heisst: da steht schon die Differenz. So kann man
+    ablesen (zwei Staende) oder rechnen lassen, was die Automation spaeter liefert.
+    """
+    ende = daten.get(f"{name}_bis")
+    if ende is None or str(ende).strip() == "":
+        if pflicht:
+            raise Eingabefehler(f"{feld}: der Endstand fehlt.")
+        return None
+    bis = zahl(ende, f"{feld} (Ende)", minimum=0.0)
+    von = zahl(daten.get(f"{name}_von"), f"{feld} (Start)", minimum=0.0, pflicht=False)
+    if bis < von:
+        raise Eingabefehler(
+            f"{feld}: der Endstand {bis:g} liegt unter dem Startstand {von:g} — "
+            f"ein Zähler läuft nicht rückwärts.")
+    return bis - von
+
+
+def ueberschuss_aus_daten(daten: dict, tarif: float) -> dict:
+    """Rechnet eine Ladung aus Zaehlerstaenden auf — und speichert nichts."""
+    return ueberschuss(
+        bezug=_differenz(daten, "bezug", "Netzbezug 1.8.0"),
+        einspeisung=_differenz(daten, "einspeisung", "Einspeisung 2.8.0"),
+        ladung=_differenz(daten, "ladung", "Ins Auto geladen"),
+        erzeugung=_differenz(daten, "erzeugung", "PV-Erzeugung", pflicht=False),
+        tarif=tarif,
+    )
 
 
 def zustand() -> dict:
@@ -318,6 +349,12 @@ class Weg(BaseHTTPRequestHandler):
             if pfad.count("/") == 1 and "." in pfad:
                 return self._datei(pfad.lstrip("/"))
             return self._fehler(HTTPStatus.NOT_FOUND, "Nicht gefunden.")
+
+        if verb == "POST" and pfad == "/api/ueberschuss":
+            # Reiner Rechner: er liest die Einstellungen und ruehrt sonst nichts an.
+            werte = speicher.einstellungen()
+            return self._json(ueberschuss_aus_daten(
+                self._koerper(), float(werte["strompreis"]) / 100.0))
 
         if verb == "POST" and pfad == "/api/ladungen":
             speicher.ladung_anlegen(**ladung_aus_daten(self._koerper()))

@@ -94,6 +94,47 @@ geladen im Schnitt zu 24,9 ct. Beide Zahlen sind richtig, sie beantworten nur
 verschiedene Fragen. Der Ø-Preis unter *Zuhause* bleibt davon unberührt der echte
 Arbeitspreis statt eines Mischwerts.
 
+#### Den Netzanteil ausrechnen lassen
+
+Solange die Wallbox den PV-Anteil nicht selbst meldet, steht unter dem
+Eingabeformular ein kleiner Rechner: **Überschuss ausrechnen**. Er speichert
+nichts, er rechnet nur — eingetragen wird danach von Hand.
+
+Hinein kommen die Zählerstände vom Ladefenster, jeweils Start und Ende:
+
+| Zähler | woher |
+|---|---|
+| Netzbezug **1.8.0** | Smart Meter — `sensor.smartmeter_bezug` |
+| Einspeisung **2.8.0** | Smart Meter — `sensor.smartmeter_einspeisung` |
+| PV-Erzeugung | Wechselrichter (optional) — `sensor.shelly1pm_bkw_energie` |
+| Ins Auto geladen | Wallbox oder Auto |
+
+Die Sensornamen stehen als Beschriftung an den Feldern; sie kommen aus dem
+Verlauf in Home Assistant (Zeitpunkt anfahren, Stand ablesen). Eine Anbindung an
+Home Assistant gibt es bewusst **nicht** — der Rechner ist ein Blatt Papier mit
+Formel, keine Integration. Wer andere Sensoren hat, ändert die vier Zeilen in
+`app/web/index.html`.
+
+Die Startfelder dürfen leer bleiben, wenn die Menge schon feststeht. Heraus kommt
+der Netzanteil zum Abtippen, dazu die Nebenrechnung:
+
+```
+Erzeugung 10,0 − Einspeisung 2,0 = 8,0 kWh Eigenverbrauch
+        + Bezug 24,0             = 32,0 kWh im Haus verbraucht
+        − Ladung 28,0            =  4,0 kWh Restlast (alles außer dem Auto)
+```
+
+Eine Frage beantwortet kein Zähler: **wem gehört der Netzbezug?** Während einer
+Wolke ziehen Haus und Auto gleichzeitig, und Strom ist nicht markiert. Der Rechner
+gibt darum eine Spanne aus — im Beispiel 20,0 bis 24,0 kWh, anteilig 21,0 — und
+schlägt den oberen Wert vor. Der passt zur Regelung, die aus der PV zuerst das
+Haus bedient und dem Auto den Überschuss gibt, und rechnet im Zweifel zu Lasten
+des Autos. Ohne PV-Erzeugung bleibt der Vorschlag, aber die Spanne entfällt.
+
+Damit das stimmt, müssen die Stände das **Ladefenster** einrahmen: abgelesen kurz
+vor dem Start und kurz nach dem Ende. Steht der Abend mit drin, schreibt die
+Rechnung dem Auto den Netzbezug des Hauses zu.
+
 Zwei Dinge dabei, die man wissen muss:
 
 - Die Energie zählt ganz normal in Strecke, Verbrauch und Vergleich — nur das
@@ -319,6 +360,7 @@ Für ein Skript, das später einmal automatisch einträgt:
 | `PUT /api/ladungen/<id>` | dasselbe, ändert einen Eintrag |
 | `DELETE /api/ladungen/<id>` | löscht einen Eintrag |
 | `PUT /api/einstellungen` | `{"benzinpreis","benzinverbrauch","strompreis","kapazitaet","fahrzeug"}` |
+| `POST /api/ueberschuss` | rechnet eine Ladung aus Zählerständen auf, **ohne** etwas zu speichern |
 | `GET /api/export.csv` | alle Einträge als CSV |
 | `GET /gesundheit` | für den Healthcheck |
 
@@ -345,6 +387,18 @@ curl -X POST http://127.0.0.1:8385/api/ladungen \
   -d '{"datum":"2026-09-03","km":26240,"kwh":30,"netz_kwh":3.4,"ct_kwh":29,"ort":"pv"}'
 ```
 
+Der Überschussrechner nimmt je Zähler `<name>_von` und `<name>_bis`
+(`bezug`, `einspeisung`, `erzeugung`, `ladung`); ein leeres `_von` heißt, dass in
+`_bis` schon die Menge steht. `erzeugung` ist weglassbar — dann fehlt in der
+Antwort die Spanne.
+
+```bash
+curl -X POST http://127.0.0.1:8385/api/ueberschuss \
+  -H 'Content-Type: application/json' \
+  -d '{"bezug_von":12345.6,"bezug_bis":12369.6,"einspeisung_von":5000,"einspeisung_bis":5002,
+       "erzeugung_von":8000,"erzeugung_bis":8010,"ladung_bis":28}'
+```
+
 Jede schreibende Antwort enthält den vollständigen neuen Zustand — die Oberfläche
 muss nach dem Speichern nichts nachladen.
 
@@ -360,7 +414,7 @@ von außen erreichbar sein, dann hinter einen Reverse-Proxy mit Authentifizierun
 python3 -m unittest discover -s tests -v
 ```
 
-77 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
+88 Tests: der Rechenkern gegen von Hand nachgerechnete Beispiele, die
 Datenhaltung samt Handarbeit an der Datei und kaputtem JSON, und die
 Weboberfläche von außen — alles gegen ein Temporärverzeichnis.
 

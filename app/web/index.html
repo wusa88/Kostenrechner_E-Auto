@@ -84,6 +84,86 @@
     </form>
   </section>
 
+  <!-- ------------------------------------------- Überschuss ausrechnen -->
+  <section class="karte" id="rechner">
+    <h2>Überschuss ausrechnen</h2>
+    <p class="unterzeile">Zählerstände vom Ladefenster rein, Netzanteil raus — zum
+      Abtippen ins Formular oben. Hier wird nichts gespeichert.</p>
+
+    <form id="rechner_formular" autocomplete="off">
+      <div class="tabellenrahmen">
+        <table class="tabelle" id="rechner_tabelle">
+          <thead>
+            <tr><th>Zähler</th><th>Start</th><th>Ende</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Netzbezug <span class="einheit">1.8.0</span>
+                <br><small class="klein">sensor.smartmeter_bezug</small></th>
+              <td data-titel="Start"><input type="text" inputmode="decimal" id="r_bezug_von" placeholder="12.345,6"></td>
+              <td data-titel="Ende"><input type="text" inputmode="decimal" id="r_bezug_bis" placeholder="12.369,6" required></td>
+            </tr>
+            <tr>
+              <th>Einspeisung <span class="einheit">2.8.0</span>
+                <br><small class="klein">sensor.smartmeter_einspeisung</small></th>
+              <td data-titel="Start"><input type="text" inputmode="decimal" id="r_einspeisung_von" placeholder="5.000,0"></td>
+              <td data-titel="Ende"><input type="text" inputmode="decimal" id="r_einspeisung_bis" placeholder="5.002,0" required></td>
+            </tr>
+            <tr>
+              <th>PV-Erzeugung <span class="einheit">optional</span>
+                <br><small class="klein">sensor.shelly1pm_bkw_energie</small></th>
+              <td data-titel="Start"><input type="text" inputmode="decimal" id="r_erzeugung_von" placeholder="8.000,0"></td>
+              <td data-titel="Ende"><input type="text" inputmode="decimal" id="r_erzeugung_bis" placeholder="8.010,0"></td>
+            </tr>
+            <tr>
+              <th>Ins Auto geladen <span class="einheit">kWh</span>
+                <br><small class="klein">aus der Wallbox oder dem Auto</small></th>
+              <td data-titel="Start"><input type="text" inputmode="decimal" id="r_ladung_von" placeholder="Zählerstand"></td>
+              <td data-titel="Ende"><input type="text" inputmode="decimal" id="r_ladung_bis" placeholder="28" required></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hinweis">Die Werte stehen in Home Assistant im Verlauf des jeweiligen
+        Sensors: Zeitpunkt anfahren, Zählerstand ablesen, hier eintragen. Die Startfelder
+        dürfen leer bleiben — dann gilt der Endwert schon als Menge. Wichtig ist nur, dass
+        Anfang und Ende das <strong>Ladefenster</strong> einrahmen: kurz vor dem Start und
+        kurz nach dem Ende. Steht der Abend mit drin, schreibt die Rechnung dem Auto den
+        Netzbezug des Hauses zu.</p>
+      <div class="knopfreihe">
+        <button type="submit" class="haupt">Ausrechnen</button>
+        <button type="button" class="leise" id="r_leeren">Felder leeren</button>
+      </div>
+    </form>
+
+    <div id="rechner_ergebnis" hidden>
+      <p class="fazit" id="r_fazit"></p>
+      <div class="zwei">
+        <div class="block">
+          <h3>Für den Eintrag oben</h3>
+          <dl>
+            <div><dt>Geladene Energie</dt><dd id="r_ladung">–</dd></div>
+            <div><dt>Davon aus dem Netz</dt><dd id="r_netz">–</dd></div>
+            <div><dt>Aus der Anlage</dt><dd id="r_pv">–</dd></div>
+            <div class="hervor"><dt>Kostet</dt><dd id="r_kosten">–</dd></div>
+          </dl>
+        </div>
+        <div class="block">
+          <h3>Nebenrechnung</h3>
+          <dl>
+            <div><dt>Erzeugt</dt><dd id="r_erzeugt">–</dd></div>
+            <div><dt>Eingespeist</dt><dd id="r_eingespeist">–</dd></div>
+            <div><dt>Aus dem Netz</dt><dd id="r_bezogen">–</dd></div>
+            <div><dt>Verbrauch im Haus</dt><dd id="r_haus">–</dd></div>
+            <div><dt>Davon ohne Auto</dt><dd id="r_rest">–</dd></div>
+          </dl>
+        </div>
+      </div>
+      <p class="hinweis merksatz" id="r_spanne"></p>
+      <div id="r_warnungen"></div>
+    </div>
+  </section>
+
   <div id="warnungen"></div>
 
   <!-- ---------------------------------------------------------- Übersicht -->

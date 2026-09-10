@@ -250,6 +250,88 @@ def nach_orten(ladungen: list[Ladung]) -> list[dict]:
     return reihen
 
 
+def ueberschuss(bezug: float, einspeisung: float, ladung: float,
+                erzeugung: float | None = None, tarif: float = 0.0) -> dict:
+    """Teilt eine Ladung in Netz- und PV-Anteil — aus abgelesenen Zaehlerstaenden.
+
+    Erwartet die *Differenzen* ueber das Ladefenster: `bezug` aus 1.8.0,
+    `einspeisung` aus 2.8.0, `erzeugung` vom Wechselrichter, `ladung` aus der
+    Wallbox. Damit stehen die uebrigen Groessen fest:
+
+        Eigenverbrauch = Erzeugung - Einspeisung
+        Hausverbrauch  = Eigenverbrauch + Bezug
+        Restlast       = Hausverbrauch - Ladung        (alles ausser dem Auto)
+
+    Offen bleibt die eine Frage, die kein Zaehler beantwortet: **wem gehoert der
+    Netzbezug?** Strom ist nicht markiert; waehrend einer Wolke ziehen Haus und
+    Auto gleichzeitig. Es gibt darum nicht eine Zahl, sondern eine Spanne:
+
+        hoch      = min(Bezug, Ladung)          das Auto zuerst am Netz
+        tief      = max(0, Bezug - Restlast)    das Haus zuerst am Netz
+        anteilig  = Bezug * Ladung / Hausverbrauch
+
+    Vorgeschlagen wird `hoch`. Das passt zur Regelung — die bedient aus der PV
+    zuerst das Haus und gibt dem Auto den Ueberschuss, also faellt der Fehlbetrag
+    dem Auto zu — und es ist die konservative Wahl: sie macht das Laden teurer,
+    nie billiger.
+
+    Ohne `erzeugung` bleibt der Vorschlag, aber es gibt keine Spanne: ohne sie
+    ist die Restlast unbekannt. Gerechnet wird trotzdem, nur ungenauer — und das
+    steht dann auch so da.
+    """
+    warnungen: list[str] = []
+    ergebnis: dict = {
+        "bezug": bezug,
+        "einspeisung": einspeisung,
+        "erzeugung": erzeugung,
+        "ladung": ladung,
+        "eigenverbrauch": None,
+        "hausverbrauch": None,
+        "restlast": None,
+        "spanne": None,
+        "warnungen": warnungen,
+    }
+
+    if erzeugung is not None:
+        eigen = erzeugung - einspeisung
+        haus = eigen + bezug
+        rest = haus - ladung
+        ergebnis.update(eigenverbrauch=eigen, hausverbrauch=haus, restlast=rest)
+
+        if eigen < 0:
+            warnungen.append(
+                f"Es wurden {einspeisung:.1f} kWh eingespeist, aber nur {erzeugung:.1f} kWh "
+                f"erzeugt — da fehlt Erzeugung. Speist noch etwas anderes hinter dem "
+                f"Zähler ein, oder ist der Ablesezeitraum nicht derselbe?"
+            )
+        if rest < 0:
+            warnungen.append(
+                f"Ins Auto gingen {ladung:.1f} kWh, im ganzen Haus verbraucht wurden aber nur "
+                f"{haus:.1f} kWh. Das kann nicht sein: entweder liegt das Ladefenster nicht "
+                f"in den abgelesenen Ständen, oder eine Erzeugung fehlt in der Bilanz."
+            )
+
+    hoch = min(bezug, ladung)
+    if erzeugung is not None and ergebnis["restlast"] is not None:
+        tief = max(0.0, bezug - max(0.0, ergebnis["restlast"]))
+        anteilig = _teilen(bezug * ladung, ergebnis["hausverbrauch"])
+        ergebnis["spanne"] = {
+            "tief": min(tief, hoch),
+            "hoch": hoch,
+            "anteilig": None if anteilig is None else min(anteilig, hoch),
+        }
+
+    netz = hoch
+    ergebnis.update(
+        netz_kwh=netz,
+        pv_kwh=ladung - netz,
+        pv_anteil=_teilen((ladung - netz) * 100.0, ladung),
+        kosten=netz * tarif,
+        tarif=tarif,
+    )
+    return ergebnis
+
+
 # Ab dieser Groesse gilt die Unsicherheit als klein genug, um sie nicht mehr
 # eigens zu erwaehnen: ein Sechstel des Verbrauchs.
 GRENZE_VORLAEUFIG = 1 / 6

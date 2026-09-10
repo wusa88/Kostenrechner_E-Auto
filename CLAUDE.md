@@ -13,7 +13,7 @@ jährlich. Läuft als Docker-Container im Heimnetz, bedienbar von mehreren Gerä
 
 ```bash
 python3 -m app.server --port 8385      # lokal starten, Daten in daten/kosten.json
-python3 -m unittest discover -s tests  # alle Tests (aktuell 77)
+python3 -m unittest discover -s tests  # alle Tests (aktuell 88)
 python3 -m unittest tests.test_rechnung.Ladestand.test_gleicher_ladestand_aendert_nichts
 python3 -m unittest discover -s tests -k ladestand     # nach Muster
 docker compose up -d                   # Container, http://localhost:8385
@@ -115,6 +115,27 @@ fehlt. Die Gegenüberstellung fällt dadurch zugunsten des Autos aus, und die
 Oberfläche sagt das unter „Wo geladen wurde" auch hin: der Wert dieser
 Kilowattstunden gehört in die Amortisation der Anlage, sonst wird dieselbe kWh
 zweimal gutgeschrieben.
+
+### Der Überschussrechner
+
+`ueberschuss()` in `rechnung.py` ist ein **Nebenwerkzeug ohne Speicher**: aus den
+Zählerdifferenzen eines Ladefensters (1.8.0 Bezug, 2.8.0 Einspeisung, Erzeugung,
+geladene kWh) fällt der Netzanteil, den man oben von Hand einträgt. Route
+`POST /api/ueberschuss` — sie liest die Einstellungen und schreibt nichts.
+
+Der Grund für die eigene Funktion ist die eine Frage, die kein Zähler beantwortet:
+**wem gehört der Netzbezug?** Während einer Wolke ziehen Haus und Auto
+gleichzeitig. Also gibt es keine Zahl, sondern eine Spanne — `min(Bezug, Ladung)`
+oben, `max(0, Bezug − Restlast)` unten, dazu die anteilige Rechnung. Vorgeschlagen
+wird die Obergrenze: sie passt zur Regelung (die PV bedient zuerst das Haus, das
+Auto bekommt den Überschuss, also fällt der Fehlbetrag dem Auto zu) und ist die
+konservative Wahl. Ohne Erzeugung bleibt der Vorschlag, aber die Spanne entfällt —
+dieselbe Logik wie beim Ladestand: lieber ungenau und gekennzeichnet als falsch
+genau.
+
+Er rechnet nur richtig, wenn die abgelesenen Stände das **Ladefenster** einrahmen.
+Steht der Abend mit drin, wird dem Auto der Netzbezug des Hauses zugeschrieben;
+die Oberfläche sagt das dazu.
 
 `verlaesslichkeit()` beziffert, wie groß der Spielraum ohne Ladestand noch ist:
 größte je eingetragene Ladung ÷ Strecke. Solange der über einem Sechstel des
